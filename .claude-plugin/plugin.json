@@ -1,0 +1,15 @@
+{
+  "name": "adataforseo",
+  "displayName": "aDataForSeo for Evolution CMS",
+  "version": "1.0.0",
+  "description": "Skill for reading index coverage, audit findings, the page matrix, SERPs and rankings of an Evolution CMS site and applying fixes through aDataForSeo's adataforseo.* eMCP tools.",
+  "author": {
+    "name": "Artur Kyryliuk",
+    "email": "mail@artur.work"
+  },
+  "homepage": "https://github.com/elcreator/aDataForSeo",
+  "repository": "https://github.com/elcreator/aDataForSeo",
+  "license": "MIT",
+  "keywords": ["evolution-cms", "mcp", "seo", "dataforseo", "adataforseo"],
+  "dependencies": ["emcp"]
+}

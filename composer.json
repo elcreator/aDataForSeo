@@ -1,0 +1,44 @@
+{
+  "name": "elcreator/adataforseo",
+  "description": "aDataForSeo — gets your Evolution CMS site found in search: DataForSEO index coverage, technical audit, keyword demand and rank tracking turned into ranked, one-click changes (sSeo fields, redirects, draft pages), run in the background within a budget.",
+  "type": "evolutioncms-plugin",
+  "keywords": ["evo", "evocms", "evolution", "evolution-cms", "seo", "dataforseo", "serp", "keywords", "rank-tracking", "audit"],
+  "license": "GPL-3.0-or-later",
+  "require": {
+    "php": "^8.3",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-openssl": "*",
+    "ext-zlib": "*",
+    "evolution-cms/evolution": "^3.5.2"
+  },
+  "require-dev": {
+    "pestphp/pest": "^4.0"
+  },
+  "suggest": {
+    "seiger/sseo": "Lets fixes write meta titles, descriptions, robots, canonicals and redirects with one click (without it fixes are shown as instructions)",
+    "seiger/stask": "Alternative queue manager: aDataForSeo runs its jobs as an sTask worker when it is installed",
+    "ext-zip": "XLSX export (CSV works without it)",
+    "ext-intl": "Better diacritics folding for keyword clustering"
+  },
+  "autoload": {
+    "psr-4": {
+      "Elcreator\\aDataForSeo\\": "src/"
+    }
+  },
+  "scripts": {
+    "test": "pest --no-coverage"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Elcreator\\aDataForSeo\\aDataForSeoServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  }
+}

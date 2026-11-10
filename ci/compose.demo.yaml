@@ -1,0 +1,25 @@
+# The demo stack: the CMS with aDataForSeo installed (ci/compose.yaml's
+# `serve`), seeded with an offline demo project by ci/demo.sh. No DataForSEO
+# account is needed: the demo key answers with invented data in the real
+# shapes. Set DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD and run
+# `artisan adfs:demo --sandbox` inside the container to use DataForSEO's free
+# sandbox instead.
+#
+#   ci/demo.sh                                       build, start, seed, print URLs
+#   docker compose -f ci/compose.demo.yaml down -v   throw it all away
+#
+# CMS: http://localhost:8080/manager/   admin / Passw0rd123
+
+name: adataforseo-demo
+
+services:
+  serve:
+    extends:
+      file: compose.yaml
+      service: serve
+    environment:
+      DATAFORSEO_LOGIN: ${DATAFORSEO_LOGIN:-}
+      DATAFORSEO_PASSWORD: ${DATAFORSEO_PASSWORD:-}
+
+volumes:
+  composer-cache:
