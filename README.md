@@ -1,7 +1,7 @@
 # aDataForSeo
 
 Gets the Evolution CMS site it is installed on found in search. It reads
-[DataForSEO](https://dataforseo.com/) — index coverage, a technical audit,
+[DataForSEO](https://try.dataforseo.com/aDataForSeo) (Ad) — index coverage, a technical audit,
 keyword demand, SERPs, rankings — and turns it into a short list of concrete
 changes to **this** site, ranked by expected effect, each applied with one
 click: sSeo titles and descriptions, redirects, draft pages. Work runs in the
