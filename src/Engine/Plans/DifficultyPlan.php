@@ -61,14 +61,15 @@ final class DifficultyPlan extends Plan
     }
 
     /** @return Target[] */
-    public static function targets(Project $project, bool $recheck): array
+    public static function targets(Project $project, bool $recheck, bool $demandFilter = true): array
     {
         return Target::query()
             ->where('project_id', $project->getKey())
             ->whereNotNull('primary_keyword_id')
-            ->where('demand_real', '>=', (int) Config::get('research.serp_check_min_demand', 50))
+            ->when($demandFilter, static fn ($q) => $q->where('demand_real', '>=', (int) Config::get('research.serp_check_min_demand', 50)))
             ->when(!$recheck, static fn ($q) => $q->whereNull('kd_serp'))
             ->orderByDesc('demand_real')
+            ->orderBy('id')
             ->limit(max(1, (int) Config::limit('serp_checks', 60)))
             ->get()->all();
     }

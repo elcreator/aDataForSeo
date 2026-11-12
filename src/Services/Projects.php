@@ -6,10 +6,12 @@ use Carbon\Carbon;
 use Elcreator\aDataForSeo\Api\Context;
 use Elcreator\aDataForSeo\Api\Credentials;
 use Elcreator\aDataForSeo\Api\Ledger;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Integrations\Sites;
 use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Models\Key;
 use Elcreator\aDataForSeo\Models\Project;
+use Elcreator\aDataForSeo\Support\Billing;
 use Elcreator\aDataForSeo\Support\Config;
 
 /**
@@ -73,11 +75,16 @@ final class Projects
         ];
     }
 
-    /** The money context of a job's calls. */
-    public static function context(Project $project, ?Job $job, ?Credentials $credentials): Context
+    /**
+     * The money context of a job's calls, in the currency the job was planned in. Through
+     * the gateway the balance is left out on purpose: the stored figure is only as fresh as
+     * the last verify, and the gateway itself refuses (402) a call it cannot pay for.
+     */
+    public static function context(Project $project, ?Job $job, ?Credentials $credentials, ?Gateway\Credentials $gateway = null): Context
     {
         $caps = self::caps($project);
         $balance = null;
+        $currency = $job !== null && $job->currency !== null && $job->currency !== '' ? (string) $job->currency : Billing::currencyOf($project);
 
         if ($credentials?->keyId !== null && $credentials->env === 'prod') {
             $balance = Key::query()->whereKey($credentials->keyId)->value('balance');
@@ -93,7 +100,8 @@ final class Projects
             (float) $caps['monthly_cap'],
             (bool) ($job?->approved ?? false),
             max(1, min(2, (int) ($job?->option('priority', 1) ?? 1))),
-            $balance
+            $balance,
+            $currency
         );
     }
 
@@ -112,6 +120,10 @@ final class Projects
 
         if (array_key_exists('mode', $input)) {
             $changes['mode'] = in_array($input['mode'], ['beginner', 'pro'], true) ? $input['mode'] : 'beginner';
+        }
+
+        if (array_key_exists('billing', $input)) {
+            $changes['billing'] = $input['billing'] === Billing::GATEWAY ? Billing::GATEWAY : Billing::OWN;
         }
 
         if (array_key_exists('domain', $input)) {
@@ -293,6 +305,7 @@ final class Projects
             'domain' => $project->domain,
             'domain_key' => $project->domain_key,
             'mode' => $project->mode,
+            'billing' => Billing::modeOf($project),
             'markets' => $project->marketList(),
             'competitors' => array_values((array) ($project->competitors ?? [])),
             'schedule' => (array) ($project->schedule ?? []),
@@ -300,7 +313,8 @@ final class Projects
             'site_languages' => $project->siteLanguages(),
             'budget' => $caps + [
                 'own' => ['monthly_cap' => $project->monthly_cap, 'job_cap' => $project->job_cap, 'approve_above' => $project->approve_above],
-                'spent_month' => (new Ledger())->spentMonth((int) $project->getKey()),
+                'spent_month' => (new Ledger())->spentMonth((int) $project->getKey(), Billing::currencyOf($project)),
+                'currency' => Billing::currencyOf($project),
                 'month' => Carbon::now()->format('Y-m'),
             ],
         ];

@@ -59,7 +59,7 @@ final class Ledger
         }
 
         if ($ctx->monthlyCap !== null && $ctx->projectId !== null) {
-            $spent = $this->spentMonth($ctx->projectId);
+            $spent = $this->spentMonth($ctx->projectId, $ctx->currency);
 
             if ($spent + $amount > $ctx->monthlyCap + self::EPSILON || ($estimate->isUnknown() && $spent >= $ctx->monthlyCap)) {
                 return 'monthly_cap';
@@ -76,7 +76,7 @@ final class Ledger
     /**
      * Write one answer to the book before it is used.
      *
-     * @param array{env?: string, cache_key?: ?string, estimate?: ?float, cached?: bool, status_code?: int, tasks?: int, items?: int, depth?: ?int, response_path?: ?string, expires_at?: mixed} $meta
+     * @param array{currency?: string, env?: string, cache_key?: ?string, estimate?: ?float, cached?: bool, status_code?: int, tasks?: int, items?: int, depth?: ?int, response_path?: ?string, expires_at?: mixed} $meta
      */
     public function record(Context $ctx, string $endpoint, float $cost, array $meta = []): Call
     {
@@ -88,6 +88,7 @@ final class Ledger
             'step_id' => $ctx->stepId,
             'user_id' => $ctx->userId,
             'env' => (string) ($meta['env'] ?? 'prod'),
+            'currency' => (string) ($meta['currency'] ?? $ctx->currency),
             'endpoint' => Endpoints::normalise($endpoint),
             'cache_key' => $meta['cache_key'] ?? null,
             'cost' => $cost,
@@ -115,18 +116,20 @@ final class Ledger
         return $call;
     }
 
-    public function spent(int $projectId, Carbon $from, ?Carbon $to = null): float
+    /** Spend in one currency (null: every row, for callers that only ever had one). */
+    public function spent(int $projectId, Carbon $from, ?Carbon $to = null, ?string $currency = null): float
     {
         return round((float) Call::query()
             ->where('project_id', $projectId)
+            ->when($currency !== null, static fn ($q) => $q->where('currency', $currency))
             ->where('fetched_at', '>=', $from)
             ->when($to !== null, static fn ($q) => $q->where('fetched_at', '<', $to))
             ->sum('cost'), 6);
     }
 
-    public function spentMonth(int $projectId): float
+    public function spentMonth(int $projectId, ?string $currency = null): float
     {
-        return $this->spent($projectId, Carbon::now()->startOfMonth());
+        return $this->spent($projectId, Carbon::now()->startOfMonth(), null, $currency);
     }
 
     public function spentJob(int $jobId): float

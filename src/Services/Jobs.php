@@ -9,12 +9,14 @@ use Elcreator\aDataForSeo\Api\Estimate;
 use Elcreator\aDataForSeo\Api\Ledger;
 use Elcreator\aDataForSeo\Engine\Planner;
 use Elcreator\aDataForSeo\Engine\Plans\Plan;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Models\Call;
 use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Models\Project;
 use Elcreator\aDataForSeo\Models\Step;
 use Elcreator\aDataForSeo\Queue\Dispatcher;
 use Elcreator\aDataForSeo\Queue\SystemQueue;
+use Elcreator\aDataForSeo\Support\Billing;
 use Elcreator\aDataForSeo\Support\Config;
 use Elcreator\aDataForSeo\Support\EventLog;
 use Elcreator\aDataForSeo\Support\Keys;
@@ -38,7 +40,8 @@ final class Jobs
     public function estimate(string $kind, Project $project, array $options, Actor $actor): array
     {
         $actor->authorize();
-        $draft = new Job(['kind' => $kind, 'project_id' => $project->getKey(), 'user_id' => $actor->userId(), 'options' => $this->options($kind, $options, $actor)]);
+        $this->refuseWithoutRecords($kind, $project);
+        $draft = new Job(['kind' => $kind, 'project_id' => $project->getKey(), 'user_id' => $actor->userId(), 'currency' => Billing::currencyOf($project), 'options' => $this->options($kind, $options, $actor)]);
         [$client, $definitions] = $this->plan($draft, $project, $actor->principal());
         $estimator = $client?->estimator();
         $priority = (int) $draft->option('priority', 1);
@@ -49,12 +52,12 @@ final class Jobs
             $estimate = Planner::estimate($definition, $estimator, $priority);
             $estimates[] = $estimate;
 
-            if (in_array($definition['kind'], ['post', 'live'], true)) {
-                $steps[] = ['name' => $definition['name'], 'kind' => $definition['kind'], 'endpoint' => $definition['endpoint'] ?? '', 'tasks' => count((array) ($definition['payload']['tasks'] ?? [])), 'estimate' => $estimate->toArray()];
+            if (in_array($definition['kind'], ['post', 'live', 'gw_submit'], true)) {
+                $steps[] = ['name' => $definition['name'], 'kind' => $definition['kind'], 'endpoint' => $definition['endpoint'] ?? '', 'tasks' => $definition['kind'] === 'gw_submit' ? 1 : count((array) ($definition['payload']['tasks'] ?? [])), 'estimate' => $estimate->toArray()];
             }
         }
 
-        return ['estimate' => Estimate::sum($estimates), 'steps' => $steps, 'plan' => $definitions];
+        return ['estimate' => Estimate::sum($estimates), 'steps' => $steps, 'plan' => $definitions, 'currency' => Billing::currencyOf($project)];
     }
 
     /** @throws WorkbenchException */
@@ -70,6 +73,9 @@ final class Jobs
             throw WorkbenchException::forbidden('custom job');
         }
 
+        $this->refuseWithoutRecords($kind, $project);
+        $currency = Billing::currencyOf($project);
+
         $running = Job::query()->where('project_id', $project->getKey())->where('kind', $kind)
             ->whereIn('status', array_merge(Job::ACTIVE, [Job::AWAITING_APPROVAL]))->first();
 
@@ -78,7 +84,7 @@ final class Jobs
         }
 
         $options = $this->options($kind, $options, $actor);
-        $job = new Job(['project_id' => $project->getKey(), 'user_id' => $actor->userId(), 'kind' => $kind, 'trigger' => $trigger, 'options' => $options, 'status' => Job::DRAFT]);
+        $job = new Job(['project_id' => $project->getKey(), 'user_id' => $actor->userId(), 'kind' => $kind, 'trigger' => $trigger, 'currency' => $currency, 'options' => $options, 'status' => Job::DRAFT]);
         [$client, $definitions] = $this->plan($job, $project, $actor->principal());
 
         if ($client === null) {
@@ -94,13 +100,13 @@ final class Jobs
         if ($ceiling !== null && $ceiling > (float) $caps['job_cap'] + 1e-9) {
             $this->discard($job);
 
-            throw WorkbenchException::refused('refusal_job_cap', ['amount' => self::money($ceiling), 'cap' => self::money((float) $caps['job_cap'])], ['kind' => $kind, 'estimate' => $ceiling]);
+            throw WorkbenchException::refused('refusal_job_cap', ['amount' => self::money($ceiling, $currency), 'cap' => self::money((float) $caps['job_cap'], $currency)], ['kind' => $kind, 'estimate' => $ceiling]);
         }
 
-        if ($ceiling !== null && $ledger->spentMonth((int) $project->getKey()) + $ceiling > (float) $caps['monthly_cap'] + 1e-9) {
+        if ($ceiling !== null && $ledger->spentMonth((int) $project->getKey(), $currency) + $ceiling > (float) $caps['monthly_cap'] + 1e-9) {
             $this->discard($job);
 
-            throw WorkbenchException::refused('refusal_monthly_cap', ['amount' => self::money($ceiling), 'cap' => self::money((float) $caps['monthly_cap'])], ['kind' => $kind, 'estimate' => $ceiling]);
+            throw WorkbenchException::refused('refusal_monthly_cap', ['amount' => self::money($ceiling, $currency), 'cap' => self::money((float) $caps['monthly_cap'], $currency)], ['kind' => $kind, 'estimate' => $ceiling]);
         }
 
         $needsApproval = $ceiling === null || $ceiling > (float) $caps['approve_above'] + 1e-9;
@@ -339,13 +345,39 @@ final class Jobs
         return true;
     }
 
-    /** @return array{0: ?Client, 1: array} */
+    /**
+     * The plan and the backend that will price and run it: the DataForSEO client, or the
+     * gateway's for a job planned in euros. Null when that backend has no key yet.
+     *
+     * @return array{0: Client|Gateway\Client|null, 1: array}
+     */
     private function plan(Job $job, Project $project, Principal $principal): array
     {
+        if (Billing::jobIsGateway($job)) {
+            $credentials = Keys::gatewayFor($principal);
+            $client = $credentials === null ? null : new Gateway\Client($credentials);
+
+            return [$client, Plan::for((string) $job->kind, true)->build($job, $project, null, Projects::context($project, $job, null, $credentials))];
+        }
+
         $credentials = Keys::for($principal);
         $client = $credentials === null ? null : new Client($credentials);
 
         return [$client, Plan::for((string) $job->kind)->build($job, $project, $client, Projects::context($project, null, $credentials))];
+    }
+
+    /**
+     * Research, tracking, competitors and the API explorer work on keyword and SERP records,
+     * which DataForSEO's terms keep out of the gateway. Refused before anything is planned
+     * or queued, and logged like every refusal (hard rule 12).
+     *
+     * @throws WorkbenchException
+     */
+    private function refuseWithoutRecords(string $kind, Project $project): void
+    {
+        if (Billing::isGateway($project) && !Billing::gatewayCan($kind)) {
+            throw WorkbenchException::refused('error_gateway_unsupported', ['what' => Lang::get('aDataForSeo::global.kind_' . $kind)], ['project' => $project->getKey(), 'kind' => $kind, 'billing' => Billing::GATEWAY]);
+        }
     }
 
     private function options(string $kind, array $options, Actor $actor): array
@@ -384,9 +416,9 @@ final class Jobs
         $job->delete();
     }
 
-    public static function money(?float $amount): string
+    public static function money(?float $amount, string $currency = Billing::CURRENCY_OWN): string
     {
-        return $amount === null ? '?' : '$' . number_format($amount, $amount < 0.1 ? 4 : 2);
+        return $amount === null ? '?' : Billing::symbol($currency) . number_format($amount, $amount < 0.1 ? 4 : 2);
     }
 
     private static function removeTree(string $path): void
@@ -411,6 +443,7 @@ final class Jobs
             'status' => $job->status,
             'phase' => $job->phase,
             'progress' => (int) $job->progress,
+            'currency' => (string) ($job->currency ?: Billing::CURRENCY_OWN),
             'estimate' => $job->estimate,
             'estimate_high' => $job->estimate_high,
             'spent' => round((float) $job->spent, 6),

@@ -6,7 +6,9 @@ use Carbon\Carbon;
 use Elcreator\aDataForSeo\Api\Client;
 use Elcreator\aDataForSeo\Api\Credentials;
 use Elcreator\aDataForSeo\Api\Pricing;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Models\Key;
+use Elcreator\aDataForSeo\Models\Project;
 
 /**
  * Which DataForSEO account a manager's work is billed to.
@@ -15,10 +17,17 @@ use Elcreator\aDataForSeo\Models\Key;
  * DATAFORSEO_PASSWORD from the environment, else none. The password is
  * decrypted only here and only into a {@see Credentials}, which refuses to be
  * serialised.
+ *
+ * A second kind of secret lives in the same table (`provider` = `gateway`): an
+ * ai.artur.work API key, encrypted the same way, for projects that pay from that
+ * balance instead. The two kinds never answer each other's lookups.
  */
 final class Keys
 {
     public const ENVS = ['prod', 'sandbox', 'demo'];
+
+    public const PROVIDER_DATAFORSEO = 'dataforseo';
+    public const PROVIDER_GATEWAY = 'gateway';
 
     public static function for(Principal $principal): ?Credentials
     {
@@ -46,14 +55,14 @@ final class Keys
         return Config::env() === 'demo' ? Credentials::demo() : null;
     }
 
-    public static function siteKey(): ?Key
+    public static function siteKey(string $provider = self::PROVIDER_DATAFORSEO): ?Key
     {
-        return Key::query()->where('scope', 'site')->orderByDesc('id')->first();
+        return Key::query()->where('provider', $provider)->where('scope', 'site')->orderByDesc('id')->first();
     }
 
-    public static function userKey(int $userId): ?Key
+    public static function userKey(int $userId, string $provider = self::PROVIDER_DATAFORSEO): ?Key
     {
-        return $userId > 0 ? Key::query()->where('scope', 'user')->where('user_id', $userId)->orderByDesc('id')->first() : null;
+        return $userId > 0 ? Key::query()->where('provider', $provider)->where('scope', 'user')->where('user_id', $userId)->orderByDesc('id')->first() : null;
     }
 
     public static function credentialsOf(Key $key): ?Credentials
@@ -148,9 +157,16 @@ final class Keys
         }
     }
 
-    /** What the page may know about the key in use: never the password, the login masked. */
-    public static function describe(Principal $principal): array
+    /**
+     * What the page may know about the key in use: never the password, the login masked.
+     * For a project that pays from the gateway it is the gateway key that is described.
+     */
+    public static function describe(Principal $principal, ?Project $project = null): array
     {
+        if ($project !== null && Billing::isGateway($project)) {
+            return self::describeGateway($principal);
+        }
+
         $key = self::userKey($principal->id) ?? self::siteKey();
         $credentials = self::for($principal);
 
@@ -166,6 +182,98 @@ final class Keys
                 'backlinks' => self::subscriptionActive($key?->subscriptions, 'backlinks'),
                 'llm_mentions' => self::subscriptionActive($key?->subscriptions, 'llm_mentions'),
             ],
+        ];
+    }
+    // ------------------------------------------------------------------
+    // The ai.artur.work key
+    // ------------------------------------------------------------------
+
+    /** The manager's own gateway key, else the site's, else none. */
+    public static function gatewayFor(Principal $principal): ?Gateway\Credentials
+    {
+        foreach ([self::userKey($principal->id, self::PROVIDER_GATEWAY), self::siteKey(self::PROVIDER_GATEWAY)] as $row) {
+            if ($row !== null && ($credentials = self::gatewayCredentialsOf($row)) !== null) {
+                return $credentials;
+            }
+        }
+
+        return null;
+    }
+
+    public static function gatewayCredentialsOf(Key $key): ?Gateway\Credentials
+    {
+        $apiKey = Crypt::decrypt($key->password_enc);
+
+        return $apiKey === null || trim($apiKey) === '' ? null : new Gateway\Credentials($apiKey, (string) $key->scope, (int) $key->getKey());
+    }
+
+    /** Store (or replace) a gateway key. The row shows only its mask in `login`; the key itself is encrypted. */
+    public static function saveGateway(string $scope, ?int $userId, #[\SensitiveParameter] string $apiKey): Key
+    {
+        $scope = $scope === 'user' ? 'user' : 'site';
+        $apiKey = trim($apiKey);
+        $key = $scope === 'user' ? self::userKey((int) $userId, self::PROVIDER_GATEWAY) : self::siteKey(self::PROVIDER_GATEWAY);
+        $key ??= new Key(['scope' => $scope, 'user_id' => $scope === 'user' ? $userId : null, 'provider' => self::PROVIDER_GATEWAY]);
+
+        $key->forceFill([
+            'login' => Gateway\Credentials::mask($apiKey),
+            'env' => 'gateway',
+            'password_enc' => Crypt::encrypt($apiKey),
+            'verified_at' => null,
+            'balance' => null,
+            'subscriptions' => null,
+        ])->save();
+
+        return $key;
+    }
+
+    /**
+     * Ask the gateway (free) whose key this is and what it holds: the balance in euros, the
+     * key's cap and where to top up, and the price list (proof that the analytics are on).
+     *
+     * @return array{balance: ?float, top_up_url: ?string, cap_eur: ?float}
+     * @throws \Elcreator\aDataForSeo\Api\ApiException
+     */
+    public static function verifyGateway(Gateway\Credentials $credentials, ?Key $key = null): array
+    {
+        $client = new Gateway\Client($credentials);
+        $account = $client->account();
+        $client->prices();
+
+        $summary = [
+            'balance' => is_numeric($account['balanceEur'] ?? null) ? (float) $account['balanceEur'] : null,
+            'top_up_url' => is_string($account['topUpUrl'] ?? null) ? $account['topUpUrl'] : null,
+            'cap_eur' => is_numeric($account['key']['capEur'] ?? null) ? (float) $account['key']['capEur'] : null,
+        ];
+
+        if ($key !== null) {
+            $key->forceFill(['balance' => $summary['balance'], 'subscriptions' => ['top_up_url' => $summary['top_up_url'], 'cap_eur' => $summary['cap_eur']], 'verified_at' => Carbon::now()])->save();
+        }
+
+        return $summary;
+    }
+
+    /** The gateway key as the page sees it: shaped like {@see self::describe()} so one header serves both. */
+    public static function describeGateway(Principal $principal): array
+    {
+        $key = self::userKey($principal->id, self::PROVIDER_GATEWAY) ?? self::siteKey(self::PROVIDER_GATEWAY);
+        $credentials = self::gatewayFor($principal);
+        $meta = (array) ($key?->subscriptions ?? []);
+
+        return [
+            'present' => $credentials !== null,
+            'source' => $credentials?->source,
+            'env' => 'gateway',
+            'login' => $credentials?->masked(),
+            'scope' => $key?->scope,
+            'verified_at' => $key?->verified_at?->toIso8601String(),
+            'balance' => $key?->balance,
+            'subscriptions' => ['backlinks' => false, 'llm_mentions' => false],
+            'billing' => Billing::GATEWAY,
+            'currency' => Billing::CURRENCY_GATEWAY,
+            'top_up_url' => $meta['top_up_url'] ?? null,
+            'cap_eur' => $meta['cap_eur'] ?? null,
+            'gateway_url' => Config::gatewayUrl(),
         ];
     }
 }

@@ -32,6 +32,23 @@ return [
         'signup_url' => 'https://try.dataforseo.com/su3o1t15dxhx',
     ],
 
+    // Pay from an ai.artur.work balance instead of a DataForSEO account: analytics only
+    // (index coverage, audit, difficulty), priced in euros. The base URL is the only place
+    // the gateway's address lives.
+    'gateway' => [
+        'url' => 'https://ai.artur.work',
+        'timeout' => 60,
+        'connect_timeout' => 10,
+        // Back-off between checks of a queued gateway task; the last value repeats.
+        'poll_seconds' => [15, 30, 60, 120],
+        'connect' => [
+            // The app slug "Connect a site" labels the key with; the gateway shows an unknown slug as sent.
+            'app' => 'adataforseo',
+            // Seconds a started Connect may take before its state is refused.
+            'pending_ttl' => 900,
+        ],
+    ],
+
     'queue' => [
         // auto (sTask when installed, else the CMS task queue) | system | stask
         'driver' => 'auto',
@@ -56,7 +73,7 @@ return [
     ],
 
     'budget' => [
-        // US dollars, as DataForSEO bills.
+        // In the project's currency: US dollars with a DataForSEO account, euros when paying from the ai.artur.work balance.
         'monthly_cap' => 5.00,
         'job_cap' => 2.00,
         'approve_above' => 0.50,

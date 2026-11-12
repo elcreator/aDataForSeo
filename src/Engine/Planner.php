@@ -4,6 +4,7 @@ namespace Elcreator\aDataForSeo\Engine;
 
 use Elcreator\aDataForSeo\Api\Estimate;
 use Elcreator\aDataForSeo\Api\Estimator;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Models\Step;
 
@@ -12,21 +13,26 @@ use Elcreator\aDataForSeo\Models\Step;
  *
  * A definition is `['name', 'kind', 'endpoint', 'payload' => [...]]`. Post and
  * live steps are priced from their tasks; a deferred live step (tasks written
- * later by an analyser) from `estimate_tasks` × `expect_items`; wait, fetch
+ * later by an analyser) from `estimate_tasks` × `expect_items`; a gateway submit
+ * from the gateway's own quote of `payload.op` + `payload.body`; wait, fetch
  * and analyse steps are free.
  */
 final class Planner
 {
-    public static function estimate(array $definition, ?Estimator $estimator, int $priority = 1): Estimate
+    public static function estimate(array $definition, Estimator|Gateway\Estimator|null $estimator, int $priority = 1): Estimate
     {
         $kind = (string) ($definition['kind'] ?? '');
         $payload = (array) ($definition['payload'] ?? []);
+
+        if ($kind === 'gw_submit') {
+            return $estimator instanceof Gateway\Estimator ? $estimator->quote((string) $payload['op'], (array) $payload['body']) : Estimate::unknown('no_key');
+        }
 
         if (!in_array($kind, ['post', 'live'], true)) {
             return Estimate::free();
         }
 
-        if ($estimator === null) {
+        if (!$estimator instanceof Estimator) {
             return Estimate::unknown('no_key');
         }
 
@@ -63,7 +69,7 @@ final class Planner
     }
 
     /** @param array<int, array<string, mixed>> $definitions */
-    public static function persist(Job $job, array $definitions, ?Estimator $estimator, int $startSeq = 1): Estimate
+    public static function persist(Job $job, array $definitions, Estimator|Gateway\Estimator|null $estimator, int $startSeq = 1): Estimate
     {
         $estimates = [];
         $seq = $startSeq;
@@ -89,7 +95,7 @@ final class Planner
     }
 
     /** Insert steps right after `$after`, shifting the rest of the plan. */
-    public static function insertAfter(Job $job, Step $after, array $definitions, ?Estimator $estimator): void
+    public static function insertAfter(Job $job, Step $after, array $definitions, Estimator|Gateway\Estimator|null $estimator): void
     {
         $definitions = array_values(array_filter($definitions, 'is_array'));
 

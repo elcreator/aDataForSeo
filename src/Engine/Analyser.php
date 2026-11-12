@@ -27,6 +27,9 @@ abstract class Analyser
         'competitors_pick' => Analysis\CompetitorsPick::class,
         'competitors' => Analysis\Competitors::class,
         'custom' => Analysis\CustomResult::class,
+        'gw_coverage' => Analysis\Gateway\CoverageResult::class,
+        'gw_audit' => Analysis\Gateway\AuditResult::class,
+        'gw_difficulty' => Analysis\Gateway\DifficultyResult::class,
     ];
 
     /** @return array{output?: array, result?: array, extend?: array, fill?: array} */

@@ -9,7 +9,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 
 #[Name('adataforseo.estimate')]
-#[Description('Read-only. What a job would cost before it is started, in US dollars; amount null means unknown and needs a manager approval. Pass the same kind and options to adataforseo.start_job after reviewing the estimate.')]
+#[Description('Read-only. What a job would cost before it is started, in the project’s currency (US dollars with a DataForSEO account, euros when paying from the ai.artur.work balance, which only runs coverage, audit and difficulty); amount null means unknown and needs a manager approval. Pass the same kind and options to adataforseo.start_job after reviewing the estimate.')]
 class EstimateTool extends Tool
 {
     protected function operation(): string

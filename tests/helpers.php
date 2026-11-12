@@ -185,6 +185,7 @@ function adfsReset(): void
     AdfsTestCore::reset();
     EventLog::$lines = [];
     Client::useTransport(null);
+    \Elcreator\aDataForSeo\Gateway\Client::useTransport(null);
     Pricing::useTable(DemoTransport::PRICES);
     UrlMap::useProvider(null);
     SSeo::fake(null);
@@ -413,6 +414,141 @@ final class AdfsFakeSeo
 
         return false;
     }
+}
+
+/**
+ * A scripted ai.artur.work gateway, stateful where it matters: it remembers a task per
+ * idempotency key (a replay returns the stored answer and creates no second task, like the
+ * real one), reports `running` for `$runningPolls` polls before `done`, and records every
+ * request. `$results` maps an operation to its analytics answer, `$quotes` to `[low, high]`
+ * (or null: the gateway cannot price it), `$charged` to chargedEur.
+ */
+final class AdfsFakeGateway implements Transport
+{
+    /** @var array<int, array{method: string, path: string, body: array, key: ?string, auth: string}> */
+    public array $requests = [];
+
+    /** @var array<string, array{id: string, op: string, body: array, polls: int}> */
+    public array $tasks = [];
+
+    /** @var array<string, array{0: int, 1: string}> stored answer per idempotency key */
+    private array $byKey = [];
+
+    public array $results = [];
+
+    public array $quotes = [];
+
+    public array $charged = [];
+
+    public int $runningPolls = 0;
+
+    /** Report every finished task as failed (the provider could not do it). */
+    public bool $failed = false;
+
+    /** Answer the next submits with this status and error envelope (a refusal), then forget it. @var array{0: int, 1: array}|null */
+    public ?array $refuse = null;
+
+    public function __construct(array $results = [])
+    {
+        $this->results = $results;
+    }
+
+    public function send(string $method, string $url, ?string $body, array $headers, int $timeout, int $connectTimeout): array
+    {
+        $path = trim((string) preg_replace('#^https?://[^/]+/v1/#', '', $url), '/');
+        $data = $body === null ? [] : (array) json_decode($body, true);
+        $key = $headers['Idempotency-Key'] ?? null;
+        $this->requests[] = ['method' => $method, 'path' => $path, 'body' => $data, 'key' => $key, 'auth' => (string) ($headers['Authorization'] ?? '')];
+
+        if ($method === 'GET' && $path === 'account') {
+            return [200, json_encode(['balanceEur' => 12.5, 'currency' => 'EUR', 'topUpUrl' => 'https://gateway.example.test/profile#balance-card', 'key' => ['capEur' => 5.0]])];
+        }
+
+        if ($method === 'GET' && $path === 'seo/prices') {
+            return [200, json_encode(['object' => 'seo.prices', 'currency' => 'EUR', 'minimumEur' => 0.01, 'operations' => []])];
+        }
+
+        if ($method === 'POST' && preg_match('#^seo/(index-coverage|audit|keywords/difficulty)$#', $path, $m)) {
+            $op = $m[1];
+
+            if (!empty($data['quote'])) {
+                [$low, $high] = $this->quotes[$op] ?? [0.01, 0.02];
+
+                return [200, json_encode(['object' => 'seo.quote', 'operation' => $op, 'low' => $low, 'high' => $high, 'currency' => 'EUR'])];
+            }
+
+            if ($key !== null && isset($this->byKey[$key])) {
+                return $this->byKey[$key];
+            }
+
+            if ($this->refuse !== null) {
+                [$status, $error] = $this->refuse;
+                $this->refuse = null;
+                $answer = [$status, json_encode(['type' => 'error', 'error' => $error])];
+                $key !== null && $this->byKey[$key] = $answer;
+
+                return $answer;
+            }
+
+            $id = 'gw-' . (count($this->tasks) + 1);
+            $this->tasks[$id] = ['id' => $id, 'op' => $op, 'body' => $data, 'polls' => 0];
+            $answer = [202, json_encode(['taskId' => $id, 'state' => 'running'])];
+            $key !== null && $this->byKey[$key] = $answer;
+
+            return $answer;
+        }
+
+        if ($method === 'GET' && preg_match('#^seo/tasks/(.+)$#', $path, $m)) {
+            $task = &$this->tasks[$m[1]];
+
+            if (!isset($task)) {
+                return [404, json_encode(['type' => 'error', 'error' => ['type' => 'not_found_error', 'message' => 'No such task.', 'code' => 'task_not_found']])];
+            }
+
+            $task['polls']++;
+
+            if ($task['polls'] <= $this->runningPolls) {
+                return [200, json_encode(['taskId' => $task['id'], 'operation' => 'seo.' . $task['op'], 'state' => 'running'])];
+            }
+
+            if ($this->failed) {
+                return [200, json_encode(['taskId' => $task['id'], 'operation' => 'seo.' . $task['op'], 'state' => 'failed', 'error' => 'The data provider could not finish.'])];
+            }
+
+            $result = $this->results[$task['op']] ?? [];
+            $result = is_callable($result) ? $result($task['body']) : $result;
+
+            return [200, json_encode(['taskId' => $task['id'], 'operation' => 'seo.' . $task['op'], 'state' => 'done', 'result' => $result + ['fetchedAt' => '2026-11-12T09:00:00+00:00'], 'chargedEur' => $this->charged[$task['op']] ?? 0.05])];
+        }
+
+        return [404, json_encode(['type' => 'error', 'error' => ['type' => 'not_found_error', 'message' => 'Not scripted.']])];
+    }
+
+    /** Submits (not quotes) of one operation, or of all. */
+    public function submits(?string $op = null): int
+    {
+        return count(array_filter($this->requests, static fn ($r) => $r['method'] === 'POST' && empty($r['body']['quote']) && ($op === null || $r['path'] === 'seo/' . $op)));
+    }
+
+    public function quotesAsked(): int
+    {
+        return count(array_filter($this->requests, static fn ($r) => !empty($r['body']['quote'])));
+    }
+}
+
+/** The gateway's error envelope. */
+function adfsGatewayError(string $type, string $message, ?string $code = null): array
+{
+    return array_filter(['type' => $type, 'message' => $message, 'code' => $code]);
+}
+
+/** A project that pays from the gateway, with a key and a manager who may spend. */
+function adfsGatewayProject(array $attributes = [], int $user = 7): Project
+{
+    adfsUser($user, ['adataforseo', 'adataforseo_spend', 'adataforseo_manage']);
+    Keys::saveGateway('site', null, 'gw-live-key-0123456789');
+
+    return adfsProject($attributes + ['billing' => 'gateway', 'markets' => [['country' => 'CZ', 'location_code' => 2203, 'languages' => ['cs', 'en'], 'geo' => []]]]);
 }
 
 adfsBoot();

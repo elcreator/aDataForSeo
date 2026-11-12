@@ -22,6 +22,8 @@ abstract class StepRunner
             'fetch' => new Fetch(),
             'live' => new Live(),
             'analyse' => new Analyse(),
+            'gw_submit' => new GatewaySubmit(),
+            'gw_wait' => new GatewayWait(),
             default => throw new \InvalidArgumentException('Unknown step kind ' . $kind),
         };
     }

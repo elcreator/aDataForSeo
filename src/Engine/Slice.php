@@ -6,10 +6,12 @@ use Carbon\Carbon;
 use Elcreator\aDataForSeo\Api\ApiException;
 use Elcreator\aDataForSeo\Api\Client;
 use Elcreator\aDataForSeo\Engine\Steps\StepRunner;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Models\Project;
 use Elcreator\aDataForSeo\Models\Step;
 use Elcreator\aDataForSeo\Services\Projects;
+use Elcreator\aDataForSeo\Support\Billing;
 use Elcreator\aDataForSeo\Support\Config;
 use Elcreator\aDataForSeo\Support\EventLog;
 use Elcreator\aDataForSeo\Support\Keys;
@@ -53,10 +55,14 @@ final class Slice
             return $this->fail($job, Lang::get('aDataForSeo::global.error_job_user'));
         }
 
-        $credentials = Keys::for($principal);
+        // The backend follows the job's own currency, not the project's current setting: a job
+        // planned against one account finishes against it even if the project is switched meanwhile.
+        $gatewayCredentials = Billing::jobIsGateway($job) ? Keys::gatewayFor($principal) : null;
+        $credentials = Billing::jobIsGateway($job) ? null : Keys::for($principal);
         $client = $credentials === null ? null : new Client($credentials);
-        $context = Projects::context($project, $job, $credentials);
-        $rt = new Runtime($job, $project, $client, $context, $budgetSeconds, $report === null ? null : \Closure::fromCallable($report));
+        $gateway = $gatewayCredentials === null ? null : new Gateway\Client($gatewayCredentials);
+        $context = Projects::context($project, $job, $credentials, $gatewayCredentials);
+        $rt = new Runtime($job, $project, $client, $context, $budgetSeconds, $report === null ? null : \Closure::fromCallable($report), $gateway);
 
         $job->forceFill([
             'status' => Job::RUNNING,
@@ -86,7 +92,7 @@ final class Slice
                 return $this->park($job, $step->next_check_at);
             }
 
-            if ($step->kind !== 'analyse' && !$rt->hasClient()) {
+            if (!$rt->hasBackendFor($step->kind)) {
                 return $this->fail($job, Lang::get('aDataForSeo::global.error_no_key'));
             }
 

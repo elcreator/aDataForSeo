@@ -78,15 +78,24 @@
     }
     function badge(text, kind) { return h('span', { 'class': 'sx-badge' + (kind ? ' is-' + kind : ''), text: text }); }
     function num(n) { if (n === null || n === undefined) { return '—'; } try { return new Intl.NumberFormat(LANG).format(Number(n)); } catch (e) { return String(n); } }
-    function money(n, unknownText) {
+    /** US dollars with a DataForSEO account, euros through ai.artur.work: a figure is shown in the currency it was booked in. */
+    function currencySymbol(currency) { return currency === 'EUR' ? '€' : '$'; }
+    function money(n, unknownText, currency) {
         if (n === null || n === undefined) { return unknownText || t('ui_price_unknown'); }
         n = Number(n);
-        return '$' + n.toFixed(n > 0 && n < 0.1 ? 4 : 2);
+        return currencySymbol(currency || (S.boot && S.boot.currency) || 'USD') + n.toFixed(n > 0 && n < 0.1 ? 4 : 2);
     }
-    function estimateText(e) {
+    function estimateText(e, currency) {
         if (!e || e.amount === null || e.unknown) { return t('ui_price_unknown'); }
-        if (e.high !== null && e.high !== undefined && Number(e.high) > Number(e.amount) + 1e-9) { return money(e.low) + ' – ' + money(e.high); }
-        return (e.exact ? '' : '≈ ') + money(e.amount);
+        if (e.high !== null && e.high !== undefined && Number(e.high) > Number(e.amount) + 1e-9) { return money(e.low, null, currency) + ' – ' + money(e.high, null, currency); }
+        return (e.exact ? '' : '≈ ') + money(e.amount, null, currency);
+    }
+    function isGateway() { return !!(S.boot && S.boot.billing === 'gateway'); }
+    /** A link from the gateway is followed only when it is a web address; a relative one is the gateway's own page. */
+    function gatewayLink(url, base) {
+        url = String(url || '');
+        if (/^https?:\/\//i.test(url)) { return url; }
+        return url.charAt(0) === '/' && /^https?:\/\//i.test(String(base || '')) ? String(base).replace(/\/$/, '') + url : '';
     }
     function when(iso) { if (!iso) { return ''; } var d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString(LANG); }
     function live(msg) { var el = $('sx-live'); if (el) { el.textContent = msg; } }
@@ -251,13 +260,13 @@
         var accountBtn = btn(t('ui_tab_account'), { small: true, icon: 'user', cls: 'sx-open-account', title: t('ui_key_title'), onclick: openAccount });
         add(accountBtn, attentionDot());
         // The data-source label opens the Account tab too: a button dressed as the label.
-        var label = key.present ? (key.env === 'demo' ? t('ui_env_demo') : (key.env === 'sandbox' ? t('ui_env_sandbox') : t('ui_env_prod'))) : t('ui_no_key');
+        var label = key.present ? (key.env === 'demo' ? t('ui_env_demo') : (key.env === 'sandbox' ? t('ui_env_sandbox') : (key.env === 'gateway' ? t('ui_env_gateway') : t('ui_env_prod')))) : t('ui_no_key');
         var kind = !key.present ? 'high' : (key.env === 'prod' ? 'done' : 'medium');
         add(s, h('span', { 'class': 'sx-account' }, [
             accountBtn,
             h('button', { type: 'button', 'class': 'sx-badge sx-badge-link is-' + kind, title: t('ui_key_title'), text: label, onclick: openAccount })
         ]));
-        if (key.balance !== null && key.balance !== undefined && key.env === 'prod') { add(s, h('span', null, [t('ui_balance') + ': ', h('b', { text: money(key.balance) })])); }
+        if (key.balance !== null && key.balance !== undefined && (key.env === 'prod' || key.env === 'gateway')) { add(s, h('span', null, [t('ui_balance') + ': ', h('b', { text: money(key.balance, null, key.env === 'gateway' ? 'EUR' : 'USD') })])); }
         add(s, h('span', null, [t('ui_spent_month') + ': ', h('b', { 'class': 'sx-money', text: money(b.budget.spent_month) }), ' / ' + money(b.budget.monthly_cap)]));
     }
 
@@ -316,12 +325,13 @@
         api('POST', '/jobs/estimate', { kind: kind, options: options }).then(function (r) {
             if (!r || r.ok === false) { modal(t('kind_' + kind), [h('div', { 'class': 'sx-alert sx-alert-error', text: errMsg(r) })]); return; }
             var e = r.estimate;
+            var cur = r.currency;
             var body = [
                 h('p', { text: t('ui_kind_help_' + kind) }),
-                h('p', null, [t('ui_estimate') + ': ', h('b', { text: estimateText(e) })]),
+                h('p', null, [t('ui_estimate') + ': ', h('b', { text: estimateText(e, cur) })]),
                 e.unknown ? h('div', { 'class': 'sx-alert sx-alert-warn', text: t('ui_estimate_unknown_help') }) : null,
                 r.steps && r.steps.length ? table([t('ui_step'), t('ui_endpoint'), { label: t('ui_estimate'), num: true }], r.steps.map(function (s) {
-                    return h('tr', null, [h('td', { text: s.name }), h('td', null, h('code', { text: s.endpoint })), h('td', { 'class': 'num', text: estimateText(s.estimate) })]);
+                    return h('tr', null, [h('td', { text: s.name }), h('td', null, h('code', { text: s.endpoint })), h('td', { 'class': 'num', text: estimateText(s.estimate, cur) })]);
                 })) : null
             ];
             var m;
@@ -345,9 +355,21 @@
         });
     }
 
+    /** Back from the gateway's consent page: `?gateway=connected|failed&message=`, shown once and removed from the address. */
+    function connectFlash() {
+        var query;
+        try { query = new URLSearchParams(location.search); } catch (e) { return; }
+        var flag = query.get('gateway');
+        if (!flag) { return; }
+        var msg = query.get('message') || '';
+        try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* framed */ }
+        setTimeout(function () { notice($('sx-page-error'), flag === 'connected' ? 'ok' : 'error', msg || (flag === 'connected' ? t('ui_gateway_connected') : t('error_unknown'))); }, 0);
+    }
+
     function start() {
         var hash = String(location.hash || '').replace('#', '');
         if (hash) { S.tab = hash; }
+        connectFlash();
         reloadBoot();
     }
 @endverbatim

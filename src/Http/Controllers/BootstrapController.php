@@ -10,6 +10,7 @@ use Elcreator\aDataForSeo\Queue\STaskQueue;
 use Elcreator\aDataForSeo\Services\Cards;
 use Elcreator\aDataForSeo\Services\Jobs;
 use Elcreator\aDataForSeo\Services\Projects;
+use Elcreator\aDataForSeo\Support\Billing;
 use Elcreator\aDataForSeo\Support\Keys;
 use Illuminate\Http\JsonResponse;
 
@@ -31,7 +32,11 @@ class BootstrapController extends Controller
                 'mode' => $project->mode,
                 'project' => $present,
                 'markets' => $present['markets'],
-                'key' => Keys::describe($actor->principal()),
+                'billing' => $present['billing'],
+                'currency' => Billing::currencyOf($project),
+                'key' => Keys::describe($actor->principal(), $project),
+                // Both ways to pay at once, so the account page can show the one that is not in use.
+                'keys' => ['own' => Keys::describe($actor->principal()), 'gateway' => Keys::describeGateway($actor->principal())],
                 'budget' => $present['budget'],
                 'queue' => Dispatcher::status(),
                 'flags' => [

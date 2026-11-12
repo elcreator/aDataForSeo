@@ -4,6 +4,7 @@ use Elcreator\aDataForSeo\Http\Controllers\BootstrapController;
 use Elcreator\aDataForSeo\Http\Controllers\CardController;
 use Elcreator\aDataForSeo\Http\Controllers\DataController;
 use Elcreator\aDataForSeo\Http\Controllers\ExplorerController;
+use Elcreator\aDataForSeo\Http\Controllers\GatewayController;
 use Elcreator\aDataForSeo\Http\Controllers\JobController;
 use Elcreator\aDataForSeo\Http\Controllers\PageController;
 use Elcreator\aDataForSeo\Http\Controllers\SettingsController;
@@ -25,6 +26,14 @@ Route::post('/project', [SettingsController::class, 'project'])->name('adatafors
 Route::post('/key', [SettingsController::class, 'key'])->name('adataforseo.key');
 Route::post('/key/verify', [SettingsController::class, 'verify'])->name('adataforseo.key.verify');
 Route::post('/key/delete', [SettingsController::class, 'deleteKey'])->name('adataforseo.key.delete');
+
+// Paying from the ai.artur.work balance: the key (Connect or pasted), checked and chosen as the way to pay.
+// `connect` and its callback are GET like aIMage's: the browser leaves for the gateway and comes back; the
+// callback is bound to the session that started it by a random state and spends nothing.
+Route::get('/gateway/connect', [GatewayController::class, 'connect'])->name('adataforseo.gateway.connect');
+Route::get('/gateway/connect/callback', [GatewayController::class, 'connectCallback'])->name('adataforseo.gateway.callback');
+Route::post('/gateway/key', [GatewayController::class, 'key'])->name('adataforseo.gateway.key');
+Route::post('/gateway/verify', [GatewayController::class, 'verify'])->name('adataforseo.gateway.verify');
 
 // Jobs (estimate: adataforseo; start/approve/cancel/retry: adataforseo_spend).
 Route::get('/jobs', [JobController::class, 'index'])->name('adataforseo.jobs');

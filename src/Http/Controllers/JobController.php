@@ -38,7 +38,7 @@ class JobController extends Controller
         return $this->respond(function () use ($request) {
             $result = (new Jobs())->estimate($this->text($request, 'kind'), $this->currentProject(), $this->listOf($request, 'options'), $this->actor());
 
-            return ['estimate' => $result['estimate']->toArray(), 'steps' => $result['steps']];
+            return ['estimate' => $result['estimate']->toArray(), 'steps' => $result['steps'], 'currency' => $result['currency']];
         });
     }
 

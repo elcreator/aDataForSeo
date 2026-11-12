@@ -162,7 +162,7 @@ final class Audit extends Analyser
     }
 
     /** A finding fixable through sSeo fields (or an instruction when the page is not a document). */
-    private static function seo(string $code, string $severity, ?int $doc, string $lang, array $suggest, array $details = []): array
+    public static function seo(string $code, string $severity, ?int $doc, string $lang, array $suggest, array $details = []): array
     {
         $suggest = array_filter($suggest, static fn ($v) => $v !== '' && $v !== null);
 

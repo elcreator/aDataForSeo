@@ -357,7 +357,7 @@ describe('translations', function () {
             $keys[] = 'refusal_' . $r;
         }
 
-        foreach (['not_indexed', 'indexed_not_in_sitemap', 'sitemap_missing', 'nothing_indexed', 'crawl_blocked', 'broken_page', 'server_error', 'empty_title', 'title_too_long', 'empty_description', 'no_h1', 'bad_canonical', 'orphan_page', 'internal_redirect', 'duplicate_title', 'duplicate_description', 'non_indexable', 'redirect_chain', 'redirect_loop', 'broken_link', 'position_drop', 'competitor_page'] as $code) {
+        foreach (['not_indexed', 'indexed_not_in_sitemap', 'sitemap_missing', 'nothing_indexed', 'crawl_blocked', 'broken_page', 'server_error', 'empty_title', 'title_too_long', 'empty_description', 'no_h1', 'bad_canonical', 'orphan_page', 'internal_redirect', 'duplicate_title', 'duplicate_description', 'non_indexable', 'redirect_chain', 'redirect_loop', 'broken_link', 'position_drop', 'competitor_page', 'audit_other'] as $code) {
             array_push($keys, 'code_' . $code, 'card_' . $code . '_title', 'card_' . $code . '_why');
         }
 

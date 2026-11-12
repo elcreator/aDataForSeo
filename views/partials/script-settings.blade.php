@@ -12,9 +12,77 @@
         return list;
     }
 
+    /** How this site pays: its own DataForSEO account or the ai.artur.work balance. Both keys can be kept; this chooses. */
+    function billingPanel() {
+        var b = S.boot;
+        var billing = radios(t('ui_billing_title'), [['own', t('ui_billing_own'), t('ui_billing_own_help')], ['gateway', t('ui_billing_gateway'), t('ui_billing_gateway_help')]], b.billing || 'own');
+        var msg = h('div', { 'class': 'sx-small' });
+        add(billing, msg);
+        billing.addEventListener('change', function () {
+            var chosen = billing.value;
+            api('POST', '/project', { billing: chosen }).then(function (r) {
+                if (!r || r.ok === false) { notice(msg, 'error', errMsg(r)); billing.value = S.boot.billing || 'own'; return; }
+                notice(msg, 'ok', t('ui_billing_saved'));
+                reloadBoot();
+            });
+        });
+        if (!b.flags.may_manage) { billing.querySelectorAll('input').forEach(function (i) { i.disabled = true; }); }
+
+        return h('div', { 'class': 'sx-panel' }, [h('h2', { text: t('ui_billing_title') }), billing, isGateway() ? h('p', { 'class': 'sx-muted sx-small', text: t('ui_gateway_limits') }) : null]);
+    }
+
+    /** The ai.artur.work key: connected (no key to copy) or pasted, with its balance and where to top it up. */
+    function gatewayPanel() {
+        var b = S.boot;
+        var key = (b.keys && b.keys.gateway) || {};
+        var scope = b.flags.may_manage ? 'site' : 'user';
+        var pasted = input('password', '', { autocomplete: 'off', placeholder: key.present ? t('ui_password_keep') : '' });
+        var msg = h('div');
+        var topUp = gatewayLink(key.top_up_url, key.gateway_url);
+        var facts = [];
+        if (key.present) {
+            facts.push(t('ui_gateway_present', { key: key.login }));
+            if (key.verified_at) { facts.push(t('ui_verified', { when: when(key.verified_at) })); }
+            if (key.balance !== null && key.balance !== undefined) { facts.push(t('ui_balance') + ': ' + money(key.balance, null, 'EUR')); }
+            if (key.cap_eur !== null && key.cap_eur !== undefined) { facts.push(t('ui_gateway_cap', { amount: money(key.cap_eur, null, 'EUR') })); }
+        }
+
+        return h('div', { 'class': 'sx-panel' }, [
+            h('h2', { text: t('ui_gateway_title') }),
+            h('p', { 'class': 'sx-muted', text: key.present ? facts.join(' · ') : t('ui_gateway_missing') }),
+            h('p', { 'class': 'sx-muted sx-small', text: t('ui_gateway_connect_help') }),
+            h('div', { 'class': 'sx-toolbar' }, [
+                h('a', { 'class': 'sx-btn sx-btn-primary', href: BASE + '/gateway/connect?scope=' + scope, target: '_top' }, [icon('key'), ' ', t('ui_gateway_connect')]),
+                topUp ? h('a', { 'class': 'sx-btn', href: topUp, target: '_blank', rel: 'noopener noreferrer' }, [icon('money'), ' ', t('ui_gateway_topup')]) : null
+            ]),
+            h('div', { 'class': 'sx-form', style: 'margin-top:.8rem' }, [field(t('ui_gateway_paste') + ': ' + t('field_gateway_key'), pasted, t('ui_gateway_key_help'))]),
+            msg,
+            h('div', { 'class': 'sx-toolbar' }, [
+                btn(t('ui_save_verify'), { primary: true, icon: 'check', disabled: !b.flags.may_spend, onclick: function (bt) {
+                    bt.disabled = true;
+                    api('POST', '/gateway/key', { scope: scope, key: pasted.value, verify: true, use: false }).then(function (r) {
+                        bt.disabled = false;
+                        if (!r || r.ok === false) { notice(msg, 'error', errMsg(r)); return; }
+                        notice(msg, 'ok', t('ui_key_saved'));
+                        reloadBoot();
+                    });
+                } }),
+                key.present ? btn(t('ui_verify'), { icon: 'refresh', onclick: function () {
+                    api('POST', '/gateway/verify', {}).then(function (r) { notice(msg, r && r.ok !== false ? 'ok' : 'error', r && r.ok !== false ? t('ui_key_verified') : errMsg(r)); if (r && r.ok !== false) { reloadBoot(); } });
+                } }) : null,
+                key.present && b.flags.may_manage ? btn(t('ui_gateway_remove'), { danger: true, onclick: function () {
+                    api('POST', '/key/delete', { scope: key.scope || scope, provider: 'gateway' }).then(function (r) { if (!r || r.ok === false) { notice(msg, 'error', errMsg(r)); return; } reloadBoot(); });
+                } }) : null
+            ])
+        ]);
+    }
+
     R.account = function (main) {
         var b = S.boot;
-        var key = b.key || {};
+        // The DataForSEO panel is always about the site's own account, whichever way the site pays now.
+        var key = (b.keys && b.keys.own) || b.key || {};
+        add(main, billingPanel());
+        add(main, gatewayPanel());
         var env = radios(t('field_env'), envChoices(key), key.env || 'prod');
         var login = input('text', '', { placeholder: key.login || '', autocomplete: 'username' });
         var password = input('password', '', { autocomplete: 'new-password', placeholder: key.present && key.env !== 'demo' ? t('ui_password_keep') : '' });

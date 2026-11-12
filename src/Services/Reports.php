@@ -12,6 +12,7 @@ use Elcreator\aDataForSeo\Models\Keyword;
 use Elcreator\aDataForSeo\Models\Project;
 use Elcreator\aDataForSeo\Models\Ranking;
 use Elcreator\aDataForSeo\Models\Target;
+use Elcreator\aDataForSeo\Support\Billing;
 
 /**
  * The professional's tables: matrix, keywords, rankings, issues, ledger,
@@ -172,18 +173,20 @@ final class Reports
 
         foreach (range(0, 5) as $back) {
             $from = Carbon::now()->startOfMonth()->subMonths($back);
-            $months[] = ['month' => $from->format('Y-m'), 'spent' => $ledger->spent((int) $project->getKey(), $from, $from->copy()->addMonth())];
+            // One currency at a time: a project that switched how it pays never sees dollars added to euros.
+            $months[] = ['month' => $from->format('Y-m'), 'spent' => $ledger->spent((int) $project->getKey(), $from, $from->copy()->addMonth(), Billing::currencyOf($project))];
         }
 
         return [
             'calls' => $rows->map(static fn (Call $c) => [
-                'id' => (int) $c->getKey(), 'endpoint' => $c->endpoint, 'env' => $c->env, 'cost' => $c->cost, 'estimate' => $c->estimate,
+                'id' => (int) $c->getKey(), 'endpoint' => $c->endpoint, 'env' => $c->env, 'currency' => (string) ($c->currency ?: 'USD'), 'cost' => $c->cost, 'estimate' => $c->estimate,
                 'cached' => $c->cached, 'status_code' => $c->status_code, 'tasks' => $c->tasks, 'items' => $c->items,
                 'job_id' => $c->job_id, 'fetched_at' => $c->fetched_at?->toIso8601String(),
             ])->all(),
             'months' => array_reverse($months),
+            'currency' => Billing::currencyOf($project),
             'jobs' => Job::query()->where('project_id', $project->getKey())->where('spent', '>', 0)->orderByDesc('id')->limit(50)->get()
-                ->map(static fn (Job $j) => ['uuid' => $j->uuid, 'kind' => $j->kind, 'estimate' => $j->estimate, 'spent' => $j->spent, 'status' => $j->status])->all(),
+                ->map(static fn (Job $j) => ['uuid' => $j->uuid, 'kind' => $j->kind, 'currency' => (string) ($j->currency ?: 'USD'), 'estimate' => $j->estimate, 'spent' => $j->spent, 'status' => $j->status])->all(),
         ];
     }
 

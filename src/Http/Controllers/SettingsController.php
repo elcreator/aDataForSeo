@@ -21,7 +21,7 @@ class SettingsController extends Controller
     public function project(Request $request): JsonResponse
     {
         return $this->respond(function () use ($request) {
-            $project = (new Projects())->update($this->currentProject(), $request->only(['mode', 'domain', 'markets', 'competitors', 'monthly_cap', 'job_cap', 'approve_above', 'settings', 'schedule']), $this->actor());
+            $project = (new Projects())->update($this->currentProject(), $request->only(['mode', 'billing', 'domain', 'markets', 'competitors', 'monthly_cap', 'job_cap', 'approve_above', 'settings', 'schedule']), $this->actor());
 
             return ['project' => Projects::present($project)];
         }, 'manage');
@@ -72,7 +72,7 @@ class SettingsController extends Controller
             // A working real login for the site: what the demo invented goes, everywhere.
             $forgotten = $scope === 'site' && $env !== 'demo' && DemoData::present() ? DemoData::forget() : null;
 
-            return ['key' => Keys::describe($this->actor()->principal()), 'verified' => $verified !== null, 'demo_forgotten' => $forgotten];
+            return ['key' => Keys::describe($this->actor()->principal(), $this->currentProject()), 'verified' => $verified !== null, 'demo_forgotten' => $forgotten];
         }, $scope === 'user' ? 'spend' : 'manage');
     }
 
@@ -88,7 +88,7 @@ class SettingsController extends Controller
 
             Keys::verify($credentials, $key);
 
-            return ['key' => Keys::describe($this->actor()->principal())];
+            return ['key' => Keys::describe($this->actor()->principal(), $this->currentProject())];
         }, 'spend');
     }
 
@@ -96,10 +96,12 @@ class SettingsController extends Controller
     {
         $scope = $this->text($request, 'scope', 'site') === 'user' ? 'user' : 'site';
 
-        return $this->respond(function () use ($scope) {
-            Key::query()->where('scope', $scope)->when($scope === 'user', fn ($q) => $q->where('user_id', $this->actor()->userId()))->delete();
+        $provider = $this->text($request, 'provider', Keys::PROVIDER_DATAFORSEO) === Keys::PROVIDER_GATEWAY ? Keys::PROVIDER_GATEWAY : Keys::PROVIDER_DATAFORSEO;
 
-            return ['key' => Keys::describe($this->actor()->principal())];
+        return $this->respond(function () use ($scope, $provider) {
+            Key::query()->where('provider', $provider)->where('scope', $scope)->when($scope === 'user', fn ($q) => $q->where('user_id', $this->actor()->userId()))->delete();
+
+            return ['key' => Keys::describe($this->actor()->principal(), $this->currentProject())];
         }, $scope === 'user' ? 'spend' : 'manage');
     }
 }

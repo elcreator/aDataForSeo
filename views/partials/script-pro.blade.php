@@ -54,15 +54,34 @@
         });
     };
 
+    var AGGREGATES = [['results', 'ui_agg_results'], ['sites', 'ui_agg_sites'], ['ugc', 'ui_agg_ugc'], ['unknown', 'ui_agg_unknown'], ['strongSites', 'ui_agg_strong'], ['strongest', 'ui_agg_strongest'], ['median', 'ui_agg_median'], ['otherLanguage', 'ui_agg_other_language']];
+
+    /**
+     * The top 10 behind a difficulty, as far as it is known. Scored through ai.artur.work there
+     * is no list of sites (it explains a score with counts), so the counts are shown instead.
+     */
     function serpDialog(tg) {
         var s = tg.serp || {};
-        modal('SERP: ' + (s.keyword || tg.primary_keyword || ''), [
+        var results = s.results || [];
+        var counts = s.aggregates && typeof s.aggregates === 'object' ? s.aggregates : null;
+        var body = [
             s.optimistic ? h('div', { 'class': 'sx-alert sx-alert-warn', text: t('ui_kd_optimistic') }) : null,
-            h('p', { 'class': 'sx-muted', text: t('ui_native_share', { n: tg.native_share === null ? '—' : Math.round(tg.native_share * 100) + '%' }) }),
-            table(['#', t('ui_host'), t('ui_title_col'), { label: t('ui_strength'), num: true }], (s.results || []).map(function (row) {
+            h('p', { 'class': 'sx-muted', text: t('ui_native_share', { n: tg.native_share === null ? '—' : Math.round(tg.native_share * 100) + '%' }) })
+        ];
+        if (results.length) {
+            body.push(table(['#', t('ui_host'), t('ui_title_col'), { label: t('ui_strength'), num: true }], results.map(function (row) {
                 return h('tr', null, [h('td', { text: row.position }), h('td', null, [row.host || '—', row.ugc ? badge('UGC') : null]), h('td', { text: row.title }), h('td', { 'class': 'num', text: row.strength })]);
-            }))
-        ]);
+            })));
+        } else if (counts) {
+            body.push(h('h3', { text: t('ui_serp_aggregates') }));
+            body.push(h('p', { 'class': 'sx-muted sx-small', text: t('ui_serp_aggregates_help') }));
+            body.push(table([t('ui_field'), { label: t('ui_value'), num: true }], AGGREGATES.filter(function (a) { return counts[a[0]] !== undefined && counts[a[0]] !== null; }).map(function (a) {
+                return h('tr', null, [h('td', { text: t(a[1]) }), h('td', { 'class': 'num', text: num(counts[a[0]]) })]);
+            })));
+        } else {
+            body.push(h('p', { 'class': 'sx-muted', text: t('ui_not_measured') }));
+        }
+        modal('SERP: ' + (s.keyword || tg.primary_keyword || ''), body);
     }
 
     function targetSeoDialog(tg) {
@@ -170,16 +189,18 @@
 
     R.ledger = function (main) {
         loading(main, '/ledger', function (holder, r) {
-            add(holder, h('div', { 'class': 'sx-panel' }, [h('h2', { text: t('ui_spend_by_month') }), table([t('ui_month'), { label: t('ui_spent'), num: true }], r.months.map(function (m) { return h('tr', null, [h('td', { text: m.month }), h('td', { 'class': 'num', text: money(m.spent) })]); }))]));
+            add(holder, h('div', { 'class': 'sx-panel' }, [h('h2', { text: t('ui_spend_by_month') }), table([t('ui_month'), { label: t('ui_spent'), num: true }], r.months.map(function (m) { return h('tr', null, [h('td', { text: m.month }), h('td', { 'class': 'num', text: money(m.spent, null, r.currency) })]); }))]));
             add(holder, h('div', { 'class': 'sx-panel' }, [h('h2', { text: t('ui_calls') }), r.calls.length ? table([t('ui_when'), t('ui_endpoint'), { label: t('ui_estimate'), num: true }, { label: t('ui_cost'), num: true }, t('ui_cached'), { label: t('ui_items'), num: true }], r.calls.map(function (c) {
                 return h('tr', null, [h('td', { 'class': 'sx-small', text: when(c.fetched_at) }), h('td', null, [h('code', { text: c.endpoint }), c.env !== 'prod' ? badge(c.env) : null]),
-                    h('td', { 'class': 'num', text: c.estimate === null ? '—' : money(c.estimate) }), h('td', { 'class': 'num', text: money(c.cost) }),
+                    h('td', { 'class': 'num', text: c.estimate === null ? '—' : money(c.estimate, null, c.currency) }), h('td', { 'class': 'num', text: money(c.cost, null, c.currency) }),
                     h('td', null, c.cached ? badge(t('ui_cached'), 'done') : ''), h('td', { 'class': 'num', text: num(c.items) })]);
             })) : h('p', { 'class': 'sx-muted', text: t('ui_ledger_empty') })]));
         });
     };
 
     R.explorer = function (main) {
+        // Raw requests go to the site's own DataForSEO account; through ai.artur.work there is nothing to send them to.
+        if (isGateway()) { add(main, h('div', { 'class': 'sx-alert sx-alert-info', text: t('ui_gateway_explorer') })); return; }
         var x = S.data.explorer || (S.data.explorer = { endpoint: 'dataforseo_labs/google/keyword_suggestions/live', payload: '[{"keyword": "byty atlantida", "location_code": 2203, "language_code": "cs", "limit": 20}]' });
         var endpoint = input('text', x.endpoint);
         var payload = h('textarea', { rows: 8, text: x.payload });

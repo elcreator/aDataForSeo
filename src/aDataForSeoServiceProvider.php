@@ -7,6 +7,7 @@ use Elcreator\aDataForSeo\Console\JobHandler;
 use Elcreator\aDataForSeo\Console\TickCommand;
 use Elcreator\aDataForSeo\Listeners\DashboardWidget;
 use Elcreator\aDataForSeo\Listeners\DocumentPanel;
+use Elcreator\aDataForSeo\Listeners\GatewayReturn;
 use Elcreator\aDataForSeo\Listeners\Pingback;
 use Elcreator\aDataForSeo\Listeners\UrlMapInvalidation;
 use Elcreator\aDataForSeo\Queue\STaskQueue;
@@ -35,10 +36,14 @@ class aDataForSeoServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if (!$this->inBackend()) {
-            // Front end: the pingback listener when enabled, and nothing else —
-            // no database, no config sync, no worker registration.
-            if (Config::isEnabled() && Config::pingbackEnabled()) {
-                $this->app['events']->listen('evolution.OnPageNotFound', [Pingback::class, 'handle']);
+            // Front end: the pingback listener when enabled and the gateway's return page (a
+            // stateless relay, see Gateway\ConnectRelay) — no database, no config sync, no worker registration.
+            if (Config::isEnabled()) {
+                if (Config::pingbackEnabled()) {
+                    $this->app['events']->listen('evolution.OnPageNotFound', [Pingback::class, 'handle']);
+                }
+
+                $this->app['events']->listen('evolution.OnPageNotFound', [GatewayReturn::class, 'handle']);
             }
 
             return;

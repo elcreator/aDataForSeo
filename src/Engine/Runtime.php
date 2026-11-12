@@ -6,6 +6,7 @@ use Elcreator\aDataForSeo\Api\Cache;
 use Elcreator\aDataForSeo\Api\Client;
 use Elcreator\aDataForSeo\Api\Context;
 use Elcreator\aDataForSeo\Api\Response;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Models\Project;
 use Elcreator\aDataForSeo\Models\Step;
@@ -29,7 +30,8 @@ final class Runtime
         private readonly ?Client $client,
         public readonly Context $context,
         float $budgetSeconds = 45.0,
-        private readonly ?\Closure $report = null
+        private readonly ?\Closure $report = null,
+        private readonly ?Gateway\Client $gateway = null
     ) {
         $this->deadline = microtime(true) + max(0.0, $budgetSeconds);
     }
@@ -46,6 +48,41 @@ final class Runtime
     public function hasClient(): bool
     {
         return $this->client !== null;
+    }
+
+    public function gateway(): Gateway\Client
+    {
+        if ($this->gateway === null) {
+            throw new RuntimeException('This job has no ai.artur.work key to call with.');
+        }
+
+        return $this->gateway;
+    }
+
+    public function hasGateway(): bool
+    {
+        return $this->gateway !== null;
+    }
+
+    /** Whether the backend a step of this kind talks to is available. Pure analysis needs none. */
+    public function hasBackendFor(string $stepKind): bool
+    {
+        return match ($stepKind) {
+            'analyse' => true,
+            'gw_submit', 'gw_wait' => $this->hasGateway(),
+            default => $this->hasClient(),
+        };
+    }
+
+    /**
+     * What a finished gateway task answered (the analytics, never provider records), as
+     * stored by its `gw_wait` step.
+     */
+    public function gatewayResult(string $waitStepName): ?array
+    {
+        $path = $this->step($waitStepName)?->output['result_path'] ?? null;
+
+        return is_string($path) ? Cache::read($path) : null;
     }
 
     public function contextFor(Step $step): Context

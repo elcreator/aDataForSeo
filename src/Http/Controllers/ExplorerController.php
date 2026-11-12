@@ -6,6 +6,8 @@ use Elcreator\aDataForSeo\Api\Client;
 use Elcreator\aDataForSeo\Api\Endpoints;
 use Elcreator\aDataForSeo\Services\Projects;
 use Elcreator\aDataForSeo\Services\WorkbenchException;
+use Elcreator\aDataForSeo\Support\Billing;
+use Elcreator\aDataForSeo\Support\Lang;
 use Elcreator\aDataForSeo\Support\Keys;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +59,11 @@ class ExplorerController extends Controller
     /** @return array{0: Client, 1: string, 2: ?array} */
     private function parse(Request $request): array
     {
+        // Raw requests to DataForSEO need the site's own account: the gateway hands out analytics only.
+        if (Billing::isGateway($this->currentProject())) {
+            throw WorkbenchException::refused('error_gateway_unsupported', ['what' => Lang::get('aDataForSeo::global.ui_tab_explorer')], ['billing' => Billing::GATEWAY]);
+        }
+
         if (!$this->actor()->mayManage() && $this->currentProject()->mode !== 'pro') {
             throw WorkbenchException::forbidden('explorer');
         }

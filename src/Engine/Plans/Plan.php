@@ -4,6 +4,7 @@ namespace Elcreator\aDataForSeo\Engine\Plans;
 
 use Elcreator\aDataForSeo\Api\Client;
 use Elcreator\aDataForSeo\Api\Context;
+use Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Models\Project;
 use Elcreator\aDataForSeo\Services\WorkbenchException;
@@ -34,9 +35,17 @@ abstract class Plan
      */
     abstract public function build(Job $job, Project $project, ?Client $client, Context $context): array;
 
-    public static function for(string $kind): self
+    /** The kinds the gateway's analytics can carry, each as one submit, one wait and the analysis. */
+    private const GATEWAY_KINDS = [
+        'coverage' => GatewayCoveragePlan::class,
+        'audit' => GatewayAuditPlan::class,
+        'difficulty' => GatewayDifficultyPlan::class,
+    ];
+
+    public static function for(string $kind, bool $gateway = false): self
     {
-        $class = self::KINDS[$kind] ?? null;
+        // Through the gateway only its own plans exist: never fall back to a plan that needs raw records.
+        $class = $gateway ? (self::GATEWAY_KINDS[$kind] ?? null) : (self::KINDS[$kind] ?? null);
 
         if ($class === null) {
             throw WorkbenchException::invalid('error_kind');
@@ -57,6 +66,21 @@ abstract class Plan
             ['name' => $name, 'kind' => 'post', 'endpoint' => self::SERP_POST, 'payload' => ['tasks' => array_values($tasks)]],
             ['name' => $name . '_wait', 'kind' => 'wait', 'payload' => ['of' => $name, 'probe_after' => 5]],
             ['name' => $name . '_fetch', 'kind' => 'fetch', 'endpoint' => $variant, 'payload' => ['of' => $name]],
+        ];
+    }
+
+    /**
+     * submit → wait for one gateway call; the analysis step comes after, written by the plan.
+     * The submit carries the request body only (never a key), and its idempotency key is
+     * `<job uuid>:<step id>`, so a slice that runs twice never pays twice.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function gateway(string $name, string $op, array $body): array
+    {
+        return [
+            ['name' => $name, 'kind' => 'gw_submit', 'endpoint' => Gateway\Client::path($op), 'payload' => ['op' => $op, 'body' => $body]],
+            ['name' => $name . '_wait', 'kind' => 'gw_wait', 'endpoint' => Gateway\Client::path($op), 'payload' => ['of' => $name, 'op' => $op]],
         ];
     }
 

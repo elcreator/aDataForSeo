@@ -71,6 +71,16 @@ generated `core/custom/adataforseo.secret`), masked in every response, never
 logged and never put in queue payloads. `DATAFORSEO_LOGIN` / `DATAFORSEO_PASSWORD`
 in the environment also work.
 
+## Two ways to pay
+
+- **Your own DataForSEO account** (above): everything is available, priced in US dollars.
+- **Your ai.artur.work balance**: no DataForSEO account. Choose "Pay from my ai.artur.work balance" in the wizard, then
+  either **Connect with ai.artur.work** (you allow the site there and set a spending limit; no key to copy) or **paste an API
+  key** created on ai.artur.work. Index coverage, the technical audit and difficulty run through it, quoted in euros before
+  you start and booked as the gateway charges them. Keyword demand, rank tracking, competitors and the API explorer need your
+  own DataForSEO account (DataForSEO's terms keep keyword and search-result records out of resale); the module says so
+  instead of failing. The gateway address is `gateway.url` in the configuration.
+
 ## Money rules
 
 - **No call without a price.** Prices come from DataForSEO's own price table

@@ -64,6 +64,21 @@ final class IndexCoverage extends Analyser
             ];
         }
 
+        return self::conclude($rt, $indexed);
+    }
+
+    /**
+     * The findings, from the pages Google shows (`$indexed`: normalised path => URL) against
+     * the sitemap the `sitemap` step read. Shared by the DataForSEO analysis and the
+     * gateway's, which hands over the same list as an answer.
+     *
+     * @param array<string, string> $indexed
+     * @param array<string, mixed> $summaryExtra added to the summary the page shows
+     * @return array{output: array, result: array}
+     */
+    public static function conclude(Runtime $rt, array $indexed, array $summaryExtra = []): array
+    {
+        $project = $rt->project;
         $sitemapStep = $rt->step('sitemap');
         $sitemap = [];
 
@@ -121,7 +136,7 @@ final class IndexCoverage extends Analyser
 
         $counts = IssueBook::sync((int) $project->getKey(), (int) $rt->job->getKey(), 'coverage', $issues);
 
-        $this->markTargets($rt, $notIndexed);
+        self::markTargets($rt, $notIndexed);
 
         $summary = [
             'sitemap' => count($sitemap),
@@ -131,13 +146,13 @@ final class IndexCoverage extends Analyser
             'not_indexed' => count($notIndexed),
             'extra' => count($extra),
             'checked_at' => Carbon::now()->toIso8601String(),
-        ];
+        ] + $summaryExtra;
 
         return ['output' => $summary + $counts, 'result' => ['coverage' => $summary]];
     }
 
     /** Targets whose page is in the sitemap but not in Google are `not_indexed`, not `exists`. */
-    private function markTargets(Runtime $rt, array $notIndexed): void
+    private static function markTargets(Runtime $rt, array $notIndexed): void
     {
         $paths = array_keys($notIndexed);
 

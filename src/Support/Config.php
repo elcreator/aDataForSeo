@@ -46,6 +46,22 @@ final class Config
         return in_array($env, ['prod', 'sandbox', 'demo'], true) ? $env : 'prod';
     }
 
+    /** The gateway's site root (where `/connect` lives), no trailing slash. The only place its address is written. */
+    public static function gatewayUrl(): string
+    {
+        $url = rtrim(trim((string) static::get('gateway.url', 'https://ai.artur.work')), '/');
+
+        return $url !== '' ? $url : 'https://ai.artur.work';
+    }
+
+    /** @return int[] seconds between checks of a queued gateway task; the last one repeats */
+    public static function gatewayPollSeconds(): array
+    {
+        $values = array_values(array_filter(array_map('intval', (array) static::get('gateway.poll_seconds', [15, 30, 60, 120])), static fn ($v) => $v > 0));
+
+        return $values ?: [15, 30, 60, 120];
+    }
+
     /** @return int[] seconds between `tasks_ready` checks; the last one repeats */
     public static function pollSeconds(): array
     {

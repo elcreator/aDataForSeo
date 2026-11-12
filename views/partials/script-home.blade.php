@@ -19,7 +19,7 @@
 
         if (w.step === 1) {
             var choice = h('div', { 'class': 'sx-choice' });
-            [['demo', t('ui_wiz_demo'), t('ui_wiz_demo_help')], ['prod', t('ui_wiz_own'), t('ui_wiz_own_help')], ['sandbox', t('ui_wiz_sandbox'), t('ui_wiz_sandbox_help')]].filter(function (c) {
+            [['demo', t('ui_wiz_demo'), t('ui_wiz_demo_help')], ['prod', t('ui_wiz_own'), t('ui_wiz_own_help')], ['gateway', t('ui_wiz_gateway'), t('ui_wiz_gateway_help')], ['sandbox', t('ui_wiz_sandbox'), t('ui_wiz_sandbox_help')]].filter(function (c) {
                 return c[0] !== 'demo' || !signedIn(S.boot.key);
             }).forEach(function (c) {
                 add(choice, h('button', { type: 'button', 'class': w.env === c[0] ? 'is-on' : null, onclick: function () { w.env = c[0]; R.wizard(); } }, [h('b', { text: c[1] }), h('span', { 'class': 'sx-muted sx-small', text: c[2] })]));
@@ -27,19 +27,36 @@
             add(panel, choice);
             var login = input('text', w.login, { autocomplete: 'username' });
             var password = input('password', '', { autocomplete: 'new-password' });
-            if (w.env !== 'demo') {
+            var gatewayKey = input('password', '', { autocomplete: 'off' });
+            if (w.env === 'gateway') {
+                // Connect (no key to copy) or paste one; a key already connected is simply kept.
+                var connected = S.boot.keys && S.boot.keys.gateway && S.boot.keys.gateway.present;
+                add(panel, h('p', { 'class': 'sx-muted', text: connected ? t('ui_gateway_present', { key: S.boot.keys.gateway.login }) : t('ui_gateway_connect_help') }));
+                add(panel, h('p', null, h('a', { 'class': 'sx-btn sx-btn-primary', href: BASE + '/gateway/connect?scope=site', target: '_top' }, [icon('key'), ' ', t('ui_gateway_connect')])));
+                add(panel, h('div', { 'class': 'sx-form' }, [field(t('field_gateway_key'), gatewayKey, t('ui_gateway_key_help'))]));
+            } else if (w.env !== 'demo') {
                 add(panel, h('div', { 'class': 'sx-form' }, [field(t('field_login'), login, t('ui_login_help')), field(t('field_password'), password, t('ui_password_help'))]));
                 add(panel, h('p', null, tryButton()));
             }
             add(panel, err);
             add(panel, h('div', { 'class': 'sx-toolbar' }, [btn(t('ui_next'), { primary: true, icon: 'arrow-right', disabled: !S.boot.flags.may_manage, onclick: function (b) {
                 b.disabled = true;
-                api('POST', '/key', { scope: 'site', env: w.env, login: login.value, password: password.value, verify: true }).then(function (r) {
+                var done = function (r) {
                     b.disabled = false;
                     if (!r || r.ok === false) { notice(err, 'error', errMsg(r)); return; }
                     w.step = 2;
                     reloadBoot();
-                });
+                };
+                if (w.env === 'gateway') {
+                    var have = S.boot.keys && S.boot.keys.gateway && S.boot.keys.gateway.present;
+                    if (gatewayKey.value === '' && have) { api('POST', '/project', { billing: 'gateway' }).then(done); return; }
+                    api('POST', '/gateway/key', { scope: 'site', key: gatewayKey.value, verify: true, use: true }).then(done);
+                    return;
+                }
+                api('POST', '/key', { scope: 'site', env: w.env, login: login.value, password: password.value, verify: true }).then(function (r) {
+                    if (r && r.ok !== false && S.boot.billing === 'gateway') { return api('POST', '/project', { billing: 'own' }); }
+                    return r;
+                }).then(done);
             } }), h('span', { 'class': 'sx-grow' }), skip]));
             if (!S.boot.flags.may_manage) { add(panel, h('div', { 'class': 'sx-alert sx-alert-warn', text: t('ui_wiz_need_manage') })); }
             return;
@@ -85,7 +102,7 @@
         Promise.all(['coverage', 'audit'].map(function (k) { return api('POST', '/jobs/estimate', { kind: k, options: {} }); })).then(function (rs) {
             var unknown = rs.some(function (r) { return !r || r.ok === false || r.estimate.unknown; });
             total = unknown ? null : rs.reduce(function (s, r) { return s + Number(r.estimate.high || r.estimate.amount); }, 0);
-            estimate.textContent = t('ui_wiz_first_run', { price: total === null ? t('ui_price_unknown') : money(total) });
+            estimate.textContent = t('ui_wiz_first_run', { price: total === null ? t('ui_price_unknown') : money(total, null, S.boot.currency) });
         });
         add(panel, h('div', { 'class': 'sx-toolbar' }, [btn(t('ui_back'), { onclick: function () { w.step = 2; R.wizard(); } }), btn(t('ui_wiz_run'), { primary: true, icon: 'play', disabled: !S.boot.flags.may_spend, onclick: function (b) {
             b.disabled = true;
@@ -156,12 +173,29 @@
         var done = (S.boot.state && S.boot.state.kinds_done) || [];
         var bar = h('div', { 'class': 'sx-panel' }, [h('h2', { text: t('ui_run_title') })]);
         var row = h('div', { 'class': 'sx-runbar' });
+        var gateway = isGateway();
+        if (gateway) { add(bar, h('p', { 'class': 'sx-muted sx-small', text: t('ui_gateway_limits') })); }
         [['coverage', 'eye'], ['audit', 'stethoscope'], ['research', 'search'], ['difficulty', 'signal'], ['track', 'line-chart'], ['competitors', 'users']].forEach(function (k) {
-            var needsResearch = (k[0] === 'difficulty' || k[0] === 'track' || k[0] === 'competitors') && done.indexOf('research') < 0;
-            add(row, btn(t('kind_' + k[0]), { icon: k[1], disabled: needsResearch || !S.boot.flags.may_spend, title: needsResearch ? t('ui_needs_research') : t('ui_kind_help_' + k[0]), onclick: function () { runJob(k[0]); } }));
+            // Through ai.artur.work nothing needs the research job; what needs keyword records explains itself instead of failing.
+            var ownOnly = gateway && (k[0] === 'research' || k[0] === 'track' || k[0] === 'competitors');
+            var needsResearch = !gateway && (k[0] === 'difficulty' || k[0] === 'track' || k[0] === 'competitors') && done.indexOf('research') < 0;
+            var onclick = function () { runJob(k[0]); };
+            if (ownOnly) { onclick = function () { modal(t('kind_' + k[0]), [h('div', { 'class': 'sx-alert sx-alert-info', text: t('ui_gateway_needs_own', { what: t('kind_' + k[0]) }) })]); }; }
+            else if (gateway && k[0] === 'difficulty') { onclick = difficultyDialog; }
+            add(row, btn(t('kind_' + k[0]), { icon: k[1], cls: ownOnly ? 'is-muted' : null, disabled: needsResearch || !S.boot.flags.may_spend, title: needsResearch ? t('ui_needs_research') : (ownOnly ? t('ui_gateway_needs_own', { what: t('kind_' + k[0]) }) : t('ui_kind_help_' + k[0])), onclick: onclick }));
         });
         add(bar, row);
         return bar;
+    }
+
+    /** Difficulty through ai.artur.work scores the targets that exist and the searches typed here. */
+    function difficultyDialog() {
+        var box = h('textarea', { rows: 8 });
+        var m = modal(t('kind_difficulty'), [h('p', { text: t('ui_kind_help_difficulty') }), field(t('ui_difficulty_keywords'), box, t('ui_difficulty_keywords_help'))], [btn(t('ui_next'), { primary: true, icon: 'arrow-right', onclick: function () {
+            var lines = box.value.split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+            m.close();
+            runJob('difficulty', lines.length ? { keywords: lines } : {});
+        } })]);
     }
 
     function card(c) {
@@ -262,8 +296,8 @@
                 h('td', null, [h('b', { text: j.kind_label }), j.trigger !== 'manual' ? h('span', { 'class': 'sx-muted', text: ' · ' + j.trigger }) : null]),
                 h('td', null, [badge(t('status_' + j.status), j.status), j.error ? h('div', { 'class': 'sx-small sx-down', text: j.error }) : null, j.status === 'waiting' && j.wake_at ? h('div', { 'class': 'sx-small sx-muted', text: t('ui_wakes', { when: when(j.wake_at) }) }) : null]),
                 h('td', null, h('div', { 'class': 'sx-progress', title: j.progress + '%' }, h('div', { style: 'width:' + j.progress + '%' }))),
-                h('td', { 'class': 'num', text: j.estimate === null ? t('ui_price_unknown') : money(j.estimate) }),
-                h('td', { 'class': 'num', text: money(j.spent) }),
+                h('td', { 'class': 'num', text: j.estimate === null ? t('ui_price_unknown') : money(j.estimate, null, j.currency) }),
+                h('td', { 'class': 'num', text: money(j.spent, null, j.currency) }),
                 h('td', { 'class': 'sx-small', text: when(j.created_at) }),
                 h('td', null, actions)
             ]);
@@ -277,7 +311,7 @@
             modal(job.kind_label, [
                 table([t('ui_step'), t('ui_status'), t('ui_endpoint'), { label: t('ui_estimate'), num: true }, { label: t('ui_spent'), num: true }], (job.steps || []).map(function (s) {
                     return h('tr', null, [h('td', { text: s.name }), h('td', null, [badge(t('status_' + s.status), s.status), s.error ? h('div', { 'class': 'sx-small sx-down', text: s.error }) : null]),
-                        h('td', null, s.endpoint ? h('code', { text: s.endpoint }) : '—'), h('td', { 'class': 'num', text: s.estimate === null ? (s.kind === 'post' || s.kind === 'live' ? t('ui_price_unknown') : '—') : money(s.estimate) }), h('td', { 'class': 'num', text: money(s.cost) })]);
+                        h('td', null, s.endpoint ? h('code', { text: s.endpoint }) : '—'), h('td', { 'class': 'num', text: s.estimate === null ? (s.kind === 'post' || s.kind === 'live' || s.kind === 'gw_submit' ? t('ui_price_unknown') : '—') : money(s.estimate, null, job.currency) }), h('td', { 'class': 'num', text: money(s.cost, null, job.currency) })]);
                 })),
                 Object.keys(job.result || {}).length ? h('pre', { 'class': 'sx-json', text: JSON.stringify(job.result, null, 2) }) : null
             ]);

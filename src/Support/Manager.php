@@ -147,6 +147,26 @@ final class Manager
         }
     }
 
+    /**
+     * A manager page as the manager's deep link (`/manager/#modules/<id>?…`), so a full-page
+     * redirect (back from an external site) opens it in a tab of the manager rather than alone.
+     * A URL outside the manager is returned unchanged.
+     */
+    public static function framedUrl(string $pageUrl, string $managerUrl): string
+    {
+        $base = rtrim((string) parse_url($managerUrl, PHP_URL_PATH), '/') . '/';
+        $parts = parse_url($pageUrl);
+        $path = is_array($parts) ? (string) ($parts['path'] ?? '') : '';
+
+        if (!str_starts_with($path, $base) || $path === $base) {
+            return $pageUrl;
+        }
+
+        return rtrim($managerUrl, '/') . '/#' . substr($path, strlen($base))
+            . (isset($parts['query']) ? '?' . $parts['query'] : '')
+            . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
+    }
+
     public static function mediaPath(string $path): string
     {
         $base = defined('EVO_BASE_PATH') ? rtrim((string) EVO_BASE_PATH, '/\\') : '';

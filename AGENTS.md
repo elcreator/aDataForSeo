@@ -14,8 +14,8 @@ data, an API explorer, exports and MCP tools. Work runs in the background on the
 
 ## Status
 
-**Built** (2026-11-10): Waves 1–4, MCP tools and the template Writer of Wave 5. Not yet: the ai.artur.work gateway
-transport and `gateway` Writer driver, local pack, AI visibility, backlinks. The offline `demo` env
+**Built** (2026-11-10): Waves 1–4, MCP tools and the template Writer of Wave 5. **Gateway mode** (2026-11-12): pay from the ai.artur.work
+balance for coverage, audit and difficulty (`src/Gateway/`, `docs/DESIGN.md` "Gateway mode"). Not yet: the `gateway` Writer driver, local pack, AI visibility, backlinks. The offline `demo` env
 (`Api\DemoTransport`) answers in DataForSEO's real shapes and drives the end-to-end tests and `adfs:demo`.
 `docs/DESIGN.md` lists the files each wave owns.
 
@@ -29,6 +29,7 @@ lang/en/global.php           the only locale edited by hand; other locales are p
 views/                       module page + partials (assets inlined, no publish step)
 src/aDataForSeoServiceProvider  register(): config + task type. boot(): migrations/lang/views, commands, scheduler,
                              listeners, MCP, module. Front end: pingback route only (when enabled), nothing else
+src/Gateway/                 Client, Estimator, Connect, Credentials (ai.artur.work; euros)
 src/Api/                     Client, Response, Pricing, Estimator, Estimate, Ledger, Cache, ApiException, Credentials
 src/Queue/                   Queue, Dispatcher, SystemQueue, STaskQueue  (aMount's classes, Run -> Job)
 src/Engine/                  Slice, Steps/{Post,Wait,Fetch,Live,Analyse}, Plans/<Kind>Plan
