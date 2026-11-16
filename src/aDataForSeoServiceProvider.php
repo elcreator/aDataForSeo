@@ -35,6 +35,10 @@ class aDataForSeoServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if (Config::isEnabled()) {
+            $this->registerMcpTools();
+        }
+
         if (!$this->inBackend()) {
             // Front end: the pingback listener when enabled and the gateway's return page (a
             // stateless relay, see Gateway\ConnectRelay) — no database, no config sync, no worker registration.
@@ -64,7 +68,6 @@ class aDataForSeoServiceProvider extends ServiceProvider
 
         STaskQueue::ensureRegistered();
 
-        $this->registerMcpTools();
         $this->registerManagerModule();
     }
 
