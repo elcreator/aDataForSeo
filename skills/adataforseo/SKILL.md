@@ -1,16 +1,12 @@
 ---
 name: adataforseo
-description: Reads SEO findings, starts budgeted checks, creates unpublished page drafts, applies fixes and undoes recorded changes via aDataForSeo eMCP tools. Use for Evolution CMS search visibility. Do NOT use for non-Evo sites or generic SEO advice.
+description: Use aDataForSeo eMCP tools to check Evolution CMS index coverage, audit findings, page demand, SERPs and rankings, or to estimate checks, apply fixes, create drafts and undo changes.
 license: MIT
+compatibility: Evolution CMS 3.5.2+ with evolution-cms/emcp and elcreator/adataforseo installed; an MCP client connected to the site's eMCP server
 metadata:
   version: "1.1.0"
-  compatibility: Evolution CMS 3.5.2+ with evolution-cms/emcp and elcreator/adataforseo installed; an MCP client connected to the site's eMCP server
   author: Artur Kyryliuk <mail@artur.work>
-  tags:
-    - evolution-cms
-    - mcp
-    - seo
-    - dataforseo
+  tags: evolution-cms, mcp, seo, dataforseo
   package: elcreator/adataforseo
 ---
 
@@ -41,8 +37,9 @@ skill).
   `tools/list` contains `adataforseo.*` tools; otherwise install
   `php artisan package:installrequire elcreator/adataforseo "*"`, run
   `php artisan migrate`, and grant the role the `adataforseo` permission.
-- Read tools need `mcp:read`, `mcp:call`. `adataforseo.apply_fix`, `.create_draft`,
-  `.start_job` and `.undo_change` need write tools enabled in
+- Listing tools requires `mcp:read` and calling tools requires `mcp:call`.
+  `adataforseo.apply_fix`, `.create_draft`, `.start_job` and `.undo_change`
+  also need write tools enabled in
   **Tools → MCP settings** plus `mcp:write`.
 - Undo can delete a draft, so `.undo_change` also needs destructive tools
   enabled and `mcp:destructive` (or the site's configured destructive scope).
@@ -57,19 +54,23 @@ skill).
 ## Instructions
 
 1. **Prioritise fixes with `adataforseo.audit`.** Summarise the highest-effect
-   cards. Use issue IDs from the sampled `items` to preview fixes. For sitemap
-   and index counts or the list of unindexed pages, use `adataforseo.coverage`.
+   cards. The `count` is the total affected count. Issue cards sample up to
+   eight URLs in `items`. Use their issue IDs to preview fixes. For sitemap and
+   index counts or the list of unindexed pages, use `adataforseo.coverage`.
 2. **Choose the report that answers the question.**
    - Use `adataforseo.matrix` to compare page demand and priority or find gaps.
-     Filters combine with AND. Totals describe the returned rows (at most 1,000).
+      Filters combine with AND. With no filters, it shows up to 1,000 targets
+      for the project in priority order. Totals describe those returned rows.
    - Use `adataforseo.serp` with a matrix target ID to explain the competition for
-     one page. Check the snapshot timestamp. Gateway snapshots contain aggregates,
-     direct snapshots can list competitors, and `serp: null` means unchecked.
+      one page. Check `serp.checked_at` and `serp.data_fetched_at` when available.
+      Gateway snapshots contain aggregates, direct snapshots can list
+      competitors, and `serp: null` means unchecked.
    - Use `adataforseo.rankings` to find position gains or losses for the site.
      It returns up to 12 tracking dates. A positive delta is an improvement
      across the two newest dates. Null means the comparison is unavailable.
 3. **Preview every fix.** Call `adataforseo.apply_fix` with `preview: true`
-   and show the `changes` (field, before, after). Include any `fields` or
+   and show the `changes` (field, before, after). If `available` is false,
+   report the manual instructions. Include any `fields` or
    `new_url` overrides in both preview and apply. Apply the same `issue`
    after the user authorizes the change.
 4. **Know the fix kinds.** `seo_fields` writes sSeo fields of the document;
@@ -83,11 +84,14 @@ skill).
 6. **Price before starting work.** Call `adataforseo.estimate` with `kind`
    (`coverage`, `audit`, `research`, `difficulty`, `track`, `competitors`, or
    `custom`) and any `options`, such as `{"crawl_pages": 100}` for an audit.
-   `amount` is in USD; `null` means unknown. Show the estimate, then call
-   `adataforseo.start_job` with the same kind and options when authorized.
-   Report its uuid, status, estimate and spent amount. `awaiting_approval`
-   requires approval on the module page; a successful start does not mean
-   the check has finished. Budgets cannot be overridden through options.
+   Direct DataForSEO estimates use USD and gateway estimates use EUR.
+   The estimate tool omits currency, so check the project's billing mode in
+   the module before quoting it. A null amount means the cost is unknown.
+   Gateway billing supports `coverage`, `audit` and `difficulty`. Show the estimate,
+   then call `adataforseo.start_job` with the same kind and options when authorized.
+   Report its UUID, status, estimate, spent amount and currency. Jobs in
+   `awaiting_approval` need approval on the module page. Check progress there.
+   The site's budget limits apply to every job.
 7. **Report applied changes** with their ids. Use `adataforseo.undo_change`
    with a `change` id when the user requests undo. It refuses values edited
    since applying and drafts that were edited or published.
@@ -121,6 +125,11 @@ skill).
 ```json
 {"name": "adataforseo.audit", "arguments": {}}
 {"name": "adataforseo.apply_fix", "arguments": {"issue": 412, "preview": true}}
+```
+
+After the user authorizes the previewed fix:
+
+```json
 {"name": "adataforseo.apply_fix", "arguments": {"issue": 412}}
 ```
 
@@ -187,7 +196,8 @@ After showing the estimate and obtaining authorization to spend:
 |---|---|---|
 | No `adataforseo.*` tools | Package missing, `adataforseo` permission missing, or `mcp.enabled` false | Install, migrate, grant the permission |
 | HTTP `403` `tool_denied` / `scope_denied` on a write tool | Write tools disabled or token without `mcp:write` | Enable write tools; recreate the token |
-| Empty cards or `coverage: null` | No check has finished yet | Estimate and start coverage and audit; check the worker and cron |
+| Empty `cards` | There are no saved open findings or high-priority page gaps to show | Check the latest run in the module before concluding the site has no issues |
+| `coverage: null` | There is no completed coverage report yet | Check the current job in the module, or estimate a new coverage check if needed |
 | JSON-RPC `-32602` `forbidden` | Manager lacks the module, document or redirect permission | Grant it, or let a permitted manager apply |
 | `-32602` `not_found` | Issue or target id from another run | Re-read `audit` / `matrix` |
 | `-32602` `error_sseo_missing` | sSeo not installed | Install `seiger/sseo` or apply the change by hand |

@@ -1,8 +1,8 @@
 {
   "name": "adataforseo",
   "displayName": "aDataForSeo for Evolution CMS",
-  "version": "1.0.0",
-  "description": "Skill for reading index coverage, audit findings, the page matrix, SERPs and rankings of an Evolution CMS site and applying fixes through aDataForSeo's adataforseo.* eMCP tools.",
+  "version": "1.1.0",
+  "description": "Use aDataForSeo through eMCP to report on Evolution CMS search visibility, estimate and start checks, preview and apply fixes, create drafts, and undo changes.",
   "author": {
     "name": "Artur Kyryliuk",
     "email": "mail@artur.work"
