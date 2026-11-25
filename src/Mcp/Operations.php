@@ -33,28 +33,29 @@ final class Operations
     public static function audit(Actor $actor, array $args = []): array
     {
         $actor->authorize();
+        $project = Projects::find();
 
-        return ['cards' => Cards::for(Projects::current())];
+        return ['cards' => $project === null ? [] : Cards::for($project)];
     }
 
     public static function matrix(Actor $actor, array $args = []): array
     {
         $actor->authorize();
 
-        return Reports::matrix(Projects::current(), array_intersect_key($args, array_flip(['country', 'lang', 'tier', 'status'])));
+        return Reports::matrix(Projects::find(), array_intersect_key($args, array_flip(['country', 'lang', 'tier', 'status'])));
     }
 
     public static function rankings(Actor $actor, array $args = []): array
     {
         $actor->authorize();
 
-        return Reports::rankings(Projects::current());
+        return Reports::rankings(Projects::find());
     }
 
     public static function serp(Actor $actor, array $args = []): array
     {
         $actor->authorize();
-        $project = Projects::current();
+        $project = Projects::find();
         $target = (new Fixes($actor))->target($project, (int) ($args['target'] ?? 0));
 
         return ['target' => Reports::presentTarget($target)];

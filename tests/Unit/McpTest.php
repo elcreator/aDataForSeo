@@ -6,6 +6,8 @@ use Elcreator\aDataForSeo\Models\Call;
 use Elcreator\aDataForSeo\Models\Change;
 use Elcreator\aDataForSeo\Models\Issue;
 use Elcreator\aDataForSeo\Models\Job;
+use Elcreator\aDataForSeo\Models\Project;
+use Elcreator\aDataForSeo\Models\Ranking;
 use Elcreator\aDataForSeo\Models\Target;
 use Elcreator\aDataForSeo\Services\Actor;
 use Elcreator\aDataForSeo\Services\WorkbenchException;
@@ -35,6 +37,68 @@ function adfsMcpTarget($project): Target
         'lang' => 'en', 'proposed_url' => 'https://example.test/en/houses-for-sale/avalon', 'status' => 'missing',
     ]);
 }
+
+it('returns empty reports without provisioning a project on a read', function () {
+    $this->project->delete();
+    adfsAdmin();
+    $actor = Actor::for(1);
+
+    expect(Operations::audit($actor))->toBe(['cards' => []])
+        ->and(Operations::matrix($actor))->toBe([
+            'targets' => [], 'totals' => ['targets' => 0, 'demand_real' => 0, 'demand_raw' => 0, 'ratio' => null],
+        ])
+        ->and(Operations::rankings($actor))->toBe(['dates' => [], 'rows' => []])
+        ->and(fn () => Operations::serp($actor, ['target' => 1]))->toThrow(WorkbenchException::class)
+        ->and(Project::query()->count())->toBe(0);
+});
+
+it('combines matrix filters and uses the returned target id to retrieve its saved SERP', function () {
+    adfsAdmin();
+    $actor = Actor::for(1);
+    $target = adfsMcpTarget($this->project);
+    $target->update(['tier' => 'P1', 'score' => 10, 'demand_real' => 20, 'demand_raw' => 50]);
+    $second = $target->replicate();
+    $second->forceFill(['lang' => 'cs', 'score' => 100])->save();
+
+    expect(array_column(Operations::matrix($actor)['targets'], 'id'))->toBe([$second->id, $target->id]);
+
+    $matrix = Operations::matrix($actor, ['country' => 'CZ', 'lang' => 'en', 'tier' => 'P1', 'status' => 'missing']);
+    expect(array_column($matrix['targets'], 'id'))->toBe([$target->id])
+        ->and($matrix['totals'])->toBe(['targets' => 1, 'demand_real' => 20, 'demand_raw' => 50, 'ratio' => 2.5])
+        ->and(Operations::serp($actor, ['target' => $target->id])['target']['serp'])->toBeNull();
+
+    $snapshot = [
+        'keyword' => 'houses in avalon', 'checked_at' => '2026-11-25T12:00:00+00:00',
+        'source' => 'gateway', 'aggregates' => ['results' => 10], 'results' => [],
+    ];
+    $target->update(['serp_snapshot' => $snapshot, 'kd_serp' => 28]);
+    expect(Operations::serp($actor, ['target' => $target->id])['target'])
+        ->toMatchArray(['serp' => $snapshot, 'kd_serp' => 28.0, 'difficulty' => 'medium']);
+});
+
+it('returns the latest twelve tracking dates and compares the two newest positions', function () {
+    adfsAdmin();
+
+    for ($day = 1; $day <= 13; $day++) {
+        Ranking::query()->create([
+            'project_id' => $this->project->id, 'keyword' => 'houses in avalon',
+            'date' => sprintf('2026-11-%02d', $day), 'position' => $day === 13 ? 4 : 7,
+        ]);
+    }
+    Ranking::query()->create([
+        'project_id' => $this->project->id, 'keyword' => 'houses in atlantis',
+        'date' => '2026-11-13', 'position' => null,
+    ]);
+
+    $rankings = Operations::rankings(Actor::for(1));
+    $rows = array_column($rankings['rows'], null, 'keyword');
+
+    expect($rankings['dates'])->toHaveCount(12)
+        ->and($rankings['dates'][0])->toBe('2026-11-02')
+        ->and($rankings['dates'][11])->toBe('2026-11-13')
+        ->and($rows['houses in avalon'])->toMatchArray(['latest' => 4, 'delta' => 3])
+        ->and($rows['houses in atlantis'])->toMatchArray(['latest' => null, 'delta' => null]);
+});
 
 it('previews and applies the same overridden fields and undoes the recorded change', function () {
     adfsUser(5, ['adataforseo', 'save_document']);

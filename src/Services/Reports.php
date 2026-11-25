@@ -62,9 +62,9 @@ final class Reports
         return $kd === null ? null : ($kd < 25 ? 'easy' : ($kd < 50 ? 'medium' : 'hard'));
     }
 
-    public static function matrix(Project $project, array $filters = []): array
+    public static function matrix(?Project $project, array $filters = []): array
     {
-        $query = Target::query()->where('project_id', $project->getKey());
+        $query = Target::query()->where('project_id', $project?->getKey());
 
         foreach (['country', 'lang', 'tier', 'status', 'deal', 'type'] as $field) {
             if (!empty($filters[$field]) && is_string($filters[$field])) {
@@ -118,13 +118,14 @@ final class Reports
         ];
     }
 
-    public static function rankings(Project $project): array
+    public static function rankings(?Project $project): array
     {
-        $dates = Ranking::query()->where('project_id', $project->getKey())->distinct()->orderByDesc('date')->limit(12)->pluck('date')
+        $query = Ranking::query()->where('project_id', $project?->getKey());
+        $dates = (clone $query)->distinct()->orderByDesc('date')->limit(12)->pluck('date')
             ->map(static fn ($d) => Carbon::parse($d)->toDateString())->all();
         $rows = [];
 
-        foreach (Ranking::query()->where('project_id', $project->getKey())->whereIn('date', $dates ?: ['1970-01-01'])->orderBy('keyword')->get() as $ranking) {
+        foreach ($query->whereIn('date', $dates)->orderBy('keyword')->get() as $ranking) {
             $date = Carbon::parse($ranking->date)->toDateString();
             $rows[$ranking->keyword]['keyword'] = $ranking->keyword;
             $rows[$ranking->keyword]['target_id'] = $ranking->target_id;

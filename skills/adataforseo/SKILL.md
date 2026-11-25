@@ -56,13 +56,18 @@ skill).
 
 ## Instructions
 
-1. **Start from the cards.** `adataforseo.audit` returns findings sorted by
-   expected effect, each with `code`, `severity`, `fix`, `effort`, `why` and up
-   to 8 `items` with issue `id`, `url` and `document_id`. Summarise the top
-   cards in plain words before touching anything.
-2. **Drill down** with `adataforseo.coverage` (sitemap vs indexed, not-indexed
-   pages), `adataforseo.matrix` (target pages per market with demand, tier and
-   `status`), `adataforseo.serp` for one target, and `adataforseo.rankings`.
+1. **Prioritise fixes with `adataforseo.audit`.** Summarise the highest-effect
+   cards. Use issue IDs from the sampled `items` to preview fixes. For sitemap
+   and index counts or the list of unindexed pages, use `adataforseo.coverage`.
+2. **Choose the report that answers the question.**
+   - Use `adataforseo.matrix` to compare page demand and priority or find gaps.
+     Filters combine with AND. Totals describe the returned rows (at most 1,000).
+   - Use `adataforseo.serp` with a matrix target ID to explain the competition for
+     one page. Check the snapshot timestamp. Gateway snapshots contain aggregates,
+     direct snapshots can list competitors, and `serp: null` means unchecked.
+   - Use `adataforseo.rankings` to find position gains or losses for the site.
+     It returns up to 12 tracking dates. A positive delta is an improvement
+     across the two newest dates. Null means the comparison is unavailable.
 3. **Preview every fix.** Call `adataforseo.apply_fix` with `preview: true`
    and show the `changes` (field, before, after). Include any `fields` or
    `new_url` overrides in both preview and apply. Apply the same `issue`

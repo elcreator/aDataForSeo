@@ -33,9 +33,14 @@ final class Projects
 
     private const TLD = ['uk' => 'gb', 'com' => 'us', 'net' => 'us', 'org' => 'us', 'io' => 'us', 'eu' => 'de'];
 
+    public static function find(string $domainKey = 'default'): ?Project
+    {
+        return Project::query()->where('domain_key', $domainKey)->first();
+    }
+
     public static function current(string $domainKey = 'default'): Project
     {
-        $project = Project::query()->where('domain_key', $domainKey)->first();
+        $project = self::find($domainKey);
 
         if ($project !== null) {
             return $project;

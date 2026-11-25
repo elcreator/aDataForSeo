@@ -33,9 +33,9 @@ final class Fixes
         return $issue;
     }
 
-    public function target(Project $project, int $id): Target
+    public function target(?Project $project, int $id): Target
     {
-        $target = Target::query()->where('project_id', $project->getKey())->find($id);
+        $target = $project === null ? null : Target::query()->where('project_id', $project->getKey())->find($id);
 
         if ($target === null) {
             throw WorkbenchException::notFound(\Elcreator\aDataForSeo\Support\Lang::get('aDataForSeo::global.what_target'));
