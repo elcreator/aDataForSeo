@@ -7,7 +7,7 @@
  * core's autoloader (`EVO_CORE_PATH_TEST`), which also brings Pest and
  * Eloquent, and maps this package's namespace on top. Everything the CMS
  * would define at boot is stubbed here; the database is in-memory SQLite
- * built by the package's real migrations (see helpers.php).
+ * built by the package's real migrations (see support.php).
  */
 
 $core = getenv('EVO_CORE_PATH_TEST') ?: 'C:/projects/Opensource/evo/evolution/core';
@@ -162,7 +162,9 @@ if (!function_exists('__')) {
 }
 
 // Loaded from here rather than a Pest.php: Pest's root is the borrowed core.
-require __DIR__ . '/helpers.php';
+// Not named helpers.php: on a case-insensitive filesystem Pest would load that
+// itself (as Helpers.php), before this autoloader exists.
+require __DIR__ . '/support.php';
 
 register_shutdown_function(static function () use ($root) {
     adfsRemoveTree($root);

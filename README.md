@@ -161,7 +161,7 @@ claude plugin install adataforseo@evolution-cms
 ## Development
 
 ```sh
-EVO_CORE_PATH_TEST=<core with dev deps> php $EVO_CORE_PATH_TEST/vendor/pestphp/pest/bin/pest --no-coverage
+ci/compose-evo.sh <dir> --dev && ci/run-tests.sh <dir>   # a CMS with this plugin and the test tools, then Pest
 ci/demo.sh                                       # CMS + plugin + demo data in Docker, http://localhost:8080/manager/
 ```
 

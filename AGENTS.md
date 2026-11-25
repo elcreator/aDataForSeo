@@ -138,9 +138,11 @@ after every action. Details: `docs/DESIGN.md`, hard rules 1–3.
 The suite will borrow an Evolution core's autoloader (no vendor dir here), as aMount's does:
 
 ```
-EVO_CORE_PATH_TEST=<core with dev deps> php $EVO_CORE_PATH_TEST/vendor/pestphp/pest/bin/pest --no-coverage
+ci/compose-evo.sh <dir> --dev && ci/run-tests.sh <dir>   # a CMS with this plugin and the test tools, then Pest
 ```
 
+Pest is in the CMS's root `vendor/` on 3.5.x and in `core/vendor/` on older 3.5 and on 3.6.x; `ci/run-tests.sh` finds
+either. On Windows run it in Docker: `docker.exe compose -f ci/compose.yaml run --rm test`.
 Never run composer in the CMS checkout. `Api\Client` takes a transport seam; fixtures are real captured responses with
 personal data removed (prices from `user_data`, Ads 12-month vectors, SERP `breadcrumb`). CI and integration use the
 sandbox. Required suites are listed in `docs/DESIGN.md` → *Tests*.
