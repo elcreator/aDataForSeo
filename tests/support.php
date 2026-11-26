@@ -505,6 +505,27 @@ final class AdfsFakeGateway implements Transport
             return $answer;
         }
 
+        // Writing answers at once, no task: `$results['meta']` is the answer (or a callable of the body).
+        if ($method === 'POST' && $path === 'seo/meta') {
+            if (!empty($data['quote'])) {
+                [$low, $high] = $this->quotes['meta'] ?? [0.0006, 0.0024];
+
+                return [200, json_encode(['object' => 'seo.quote', 'operation' => 'seo.meta', 'low' => $low, 'high' => $high, 'currency' => 'EUR', 'runs' => ['min' => 1, 'max' => 4]])];
+            }
+
+            if ($this->refuse !== null) {
+                [$status, $error] = $this->refuse;
+                $this->refuse = null;
+
+                return [$status, json_encode(['type' => 'error', 'error' => $error])];
+            }
+
+            $answer = $this->results['meta'] ?? ['variants' => [['title' => 'Pronájem bytů Atlantida | Example Realty', 'description' => 'Pronájem bytů v Atlantidě: 12 nabídek.', 'titleChars' => 39, 'titlePx' => 380, 'descriptionChars' => 38, 'claims' => [['text' => '12 nabídek', 'keys' => ['pagesInSection', '@keyword', '@title']]]]]];
+            $answer = is_callable($answer) ? $answer($data) : $answer;
+
+            return [200, json_encode($answer + ['object' => 'seo.meta', 'lang' => $data['lang'] ?? 'en', 'dropped' => [], 'warnings' => [], 'provenance' => ['generated' => true], 'runs' => ['r1', 'r2'], 'chargedEur' => $this->charged['meta'] ?? 0.0011])];
+        }
+
         if ($method === 'GET' && preg_match('#^seo/tasks/(.+)$#', $path, $m)) {
             $task = &$this->tasks[$m[1]];
 

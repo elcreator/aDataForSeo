@@ -294,6 +294,10 @@ final class Projects
             $out['javascript'] = filter_var($input['javascript'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('writer', $input)) {
+            $out['writer'] = $input['writer'] === GatewayWriter::DRIVER ? GatewayWriter::DRIVER : 'template';
+        }
+
         if (isset($input['vertical']) && preg_match('/^[a-z0-9_]+$/', (string) $input['vertical'])) {
             $out['vertical'] = (string) $input['vertical'];
         }

@@ -165,6 +165,7 @@
         var seeds = h('textarea', { rows: 3, text: ((p.settings || {}).seeds || []).join('\n') });
         var brands = input('text', ((p.settings || {}).brand_terms || []).join(', '));
         var crawl = input('number', (p.settings || {}).crawl_pages || 200, { min: '10', max: '10000' });
+        var writer = radios(t('field_writer'), [['template', t('ui_writer_template'), t('ui_writer_template_help')], ['gateway', t('ui_writer_gateway'), t('ui_writer_gateway_help')]], (p.settings || {}).writer === 'gateway' ? 'gateway' : 'template');
         var own = p.budget.own || {};
         var monthly = input('number', own.monthly_cap === null ? '' : own.monthly_cap, { step: '0.5', placeholder: String(p.budget.monthly_cap) });
         var jobCap = input('number', own.job_cap === null ? '' : own.job_cap, { step: '0.1', placeholder: String(p.budget.job_cap) });
@@ -187,6 +188,7 @@
             ]),
             field(t('field_places'), places, t('ui_places_help')),
             field(t('field_seeds'), seeds, t('ui_seeds_help')),
+            writer,
             h('h3', { text: t('ui_budget_title') }),
             h('div', { 'class': 'sx-form' }, [field(t('field_monthly_cap'), monthly, t('ui_monthly_cap_help')), field(t('field_job_cap'), jobCap, t('ui_job_cap_help')), field(t('field_approve_above'), approve, t('ui_approve_above_help'))]),
             h('h3', { text: t('ui_schedule_title') }),
@@ -208,7 +210,7 @@
                     markets: [{ country: country.value, location_code: market.country.toUpperCase() === country.value.toUpperCase() ? market.location_code : c.location_code, languages: languages.value, geo: parsePlaces(places.value) }],
                     competitors: competitors.value, monthly_cap: monthly.value, job_cap: jobCap.value, approve_above: approve.value,
                     schedule: scheduleValues,
-                    settings: { site_languages: siteLanguages.value, seeds: seeds.value, brand_terms: brands.value, crawl_pages: crawl.value, weights: weightValues }
+                    settings: { site_languages: siteLanguages.value, seeds: seeds.value, brand_terms: brands.value, crawl_pages: crawl.value, writer: writer.value, weights: weightValues }
                 }).then(function (r) {
                     bt.disabled = false;
                     if (!r || r.ok === false) { notice(msg, 'error', errMsg(r)); return; }

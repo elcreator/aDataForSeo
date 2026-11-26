@@ -8,6 +8,7 @@ use Elcreator\aDataForSeo\Http\Controllers\GatewayController;
 use Elcreator\aDataForSeo\Http\Controllers\JobController;
 use Elcreator\aDataForSeo\Http\Controllers\PageController;
 use Elcreator\aDataForSeo\Http\Controllers\SettingsController;
+use Elcreator\aDataForSeo\Http\Controllers\WriterController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -53,6 +54,11 @@ Route::post('/targets/{id}/preview', [CardController::class, 'previewTarget'])->
 Route::post('/targets/{id}/apply', [CardController::class, 'applyTarget'])->whereNumber('id')->name('adataforseo.targets.apply');
 Route::post('/targets/{id}/document', [CardController::class, 'assign'])->whereNumber('id')->name('adataforseo.targets.document');
 Route::post('/changes/{id}/undo', [CardController::class, 'undo'])->whereNumber('id')->name('adataforseo.changes.undo');
+
+// Title/description variants written by ai.artur.work (project setting `writer` = gateway); filled into the
+// fix dialog, applied only by its own button.
+Route::post('/writer/quote', [WriterController::class, 'quote'])->name('adataforseo.writer.quote');
+Route::post('/writer/meta', [WriterController::class, 'meta'])->name('adataforseo.writer.meta');
 
 // Data behind the cards (pro tabs).
 Route::get('/matrix', [DataController::class, 'matrix'])->name('adataforseo.matrix');

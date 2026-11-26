@@ -5,16 +5,18 @@ State on 2026-11-27. The plugin (`elcreator/adataforseo`, this repo) and the ai.
 and deployed: the plugin is pushed to GitHub, the gateway is copied to prod with `tmp/prod-deploy.sh` (no auto-deploy,
 no reviewers, no customers yet). `AGENTS.md` and `docs/DESIGN.md` are the contracts; read them first.
 
-Done on 2026-11-26/27, for context: DataForSEO refunds are counted (SERP shorter than its depth, OnPage crawl below
+Done on 2026-11-26/27, for context: the `gateway` Writer for titles and descriptions; DataForSEO refunds are counted (SERP shorter than its depth, OnPage crawl below
 `max_crawl_pages`), search operators cost ×5, one-click fixes for short titles and missing canonicals, and the
 gateway's daily billing reconciliation (`SeoData\Reconciliation`, admin panel + mail to `admin_email`).
 
 ## Plugin features (DESIGN.md "Wave 5")
 
-1. **`gateway` Writer driver.** The template Writer exists; the gateway side (feature 31: `/v1/seo/meta`, `/schema`,
-   `/media`, `/check`, `/translate`) is built and deployed (`modules/Seo/controllers/WritingController.php`). Missing:
-   the plugin driver that sends the target's real data as `facts`, quotes first, books the charge like `gw_wait`, and
-   shows suggestions that are applied only on a click. Off by default.
+1. **`gateway` Writer, the rest of feature 31.** Titles and descriptions are built (2026-11-27,
+   `Services\GatewayWriter`, "Suggest with AI" in the fix dialogs, setting `writer` on the Settings tab; verified
+   against the real gateway: EUR 0.0003 per call). Not built: `/seo/schema` (JSON-LD from facts, free: a natural next
+   step through sSeo's `structured_data`), `/seo/check` (scaled-content risk before publishing a draft),
+   `/seo/translate` (a draft in a missing locale, `needs_locale` targets) and `/seo/media`. The DocumentPanel
+   (`OnDocFormRender`) has no AI button yet.
 2. **AI visibility.** The gateway has `seo.ai_visibility` (SERP `ai_overview` + LLM Scraper, priced per query and
    platform). The plugin has no plan, analyser or card for it, in either billing mode. Own key: `ai_overview` is
    already in fetched SERPs (free); LLM Mentions only when `llm_mentions_subscription_expiry_date` is in the future.

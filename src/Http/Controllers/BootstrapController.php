@@ -8,6 +8,7 @@ use Elcreator\aDataForSeo\Models\Job;
 use Elcreator\aDataForSeo\Queue\Dispatcher;
 use Elcreator\aDataForSeo\Queue\STaskQueue;
 use Elcreator\aDataForSeo\Services\Cards;
+use Elcreator\aDataForSeo\Services\GatewayWriter;
 use Elcreator\aDataForSeo\Services\Jobs;
 use Elcreator\aDataForSeo\Services\Projects;
 use Elcreator\aDataForSeo\Support\Billing;
@@ -46,6 +47,8 @@ class BootstrapController extends Controller
                     'slang' => Sites::hasSLang(),
                     'smultisite' => Sites::hasMultisite(),
                     'stask' => (new STaskQueue())->available(),
+                    // "Suggest with AI" in the fix dialogs: switched on, and a gateway key to pay with.
+                    'writer_ai' => GatewayWriter::enabled($project) && $actor->maySpend() && Keys::gatewayFor($actor->principal()) !== null,
                 ],
                 'state' => Cards::state($project),
                 'jobs' => Job::query()->where('project_id', $project->getKey())->orderByDesc('id')->limit(20)->get()->map(static fn (Job $j) => Jobs::present($j))->all(),

@@ -2,7 +2,8 @@
 
 Package `elcreator/adataforseo`, namespace `Elcreator\aDataForSeo\` → `src/`, PHP 8.3+, an **Evolution CMS 3.5+**
 plugin (`evolutioncms-plugin`), GPL-3.0-or-later. Read this before touching code: parallel authors rely on the
-contracts below. Waves 1–4 and the Wave 5 MCP tools and template Writer are implemented (2026-11-10); this file
+contracts below. Waves 1–4 and the Wave 5 MCP tools and template Writer are implemented (2026-11-10), the `gateway`
+Writer driver on 2026-11-27; this file
 remains the specification they are held to.
 
 Reference implementations to imitate (same author, same conventions — read, do not edit):
@@ -293,6 +294,19 @@ Learned on a real site (bazadomu.com, 2026-11-09); every rule here exists becaus
   `docs/features/31-seo-writing.md`: `/v1/seo/meta`, `/schema`, `/media`, `/check`, `/translate`, later `/page`; the
   plugin sends the target's real data as `facts`, which the gateway requires and validates claims against; key
   handled like aIMage's `ApiKeys`; off by default). Suggestions are never applied without a click.
+  **Built 2026-11-27 for titles and descriptions** (`Services\GatewayWriter`, `WriterController`, `POST /writer/quote`
+  and `/writer/meta` with `{issue}` or `{target}`, `adataforseo_spend` and `save_document` on the page): project
+  setting `settings.writer` = `template` (default) | `gateway`, chosen on the Settings tab; bootstrap flag
+  `writer_ai` = on + may spend + a gateway key. The request carries the target's primary keyword and up to 10 of its
+  keywords by volume, the page (longtitle/pagetitle, pagetitle as H1, the template description as summary, URL),
+  the titles of published siblings (≤ 200) and `facts` = `siteName`, `place` (the market's spellings per language),
+  `deal`/`propertyType` (lexicon words, only for a language the lexicon has) and `pagesInSection` (published
+  children, ≥ 2). Demand, difficulty and positions never become facts. `/writer/meta` answers synchronously: quote,
+  `approve_above` gate (the page shows the price first and confirms), `Ledger::allow` in **euros** whatever the
+  project pays its analytics with, `Gateway\Client::write()` books `chargedEur` once per idempotency key, also from
+  the error body of a `422 seo_unsupported_claim` / `seo_no_valid_variant`. The fix dialogs show "Suggest with AI"
+  under the title/description inputs; "Use this" only fills the inputs. `@`-prefixed claim keys (the gateway's names
+  for page data) are not shown as sources. Not built: `/schema`, `/media`, `/check`, `/translate`.
 - Local businesses — wizard question "do customers visit you?" turns on SERP maps / local pack tracking and Business
   Data checks.
 - AI visibility — `ai_overview` presence from fetched SERPs (free, already in the data) and the AI Optimization API

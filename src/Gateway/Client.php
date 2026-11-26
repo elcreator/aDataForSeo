@@ -5,6 +5,7 @@ namespace Elcreator\aDataForSeo\Gateway;
 use Elcreator\aDataForSeo\Api\ApiException;
 use Elcreator\aDataForSeo\Api\Context;
 use Elcreator\aDataForSeo\Api\CurlTransport;
+use Elcreator\aDataForSeo\Api\Estimate;
 use Elcreator\aDataForSeo\Api\Ledger;
 use Elcreator\aDataForSeo\Api\Transport;
 use Elcreator\aDataForSeo\Models\Call;
@@ -32,6 +33,7 @@ final class Client
         'index-coverage' => 'seo/index-coverage',
         'audit' => 'seo/audit',
         'keywords/difficulty' => 'seo/keywords/difficulty',
+        'meta' => 'seo/meta',
     ];
 
     private static ?Transport $override = null;
@@ -112,6 +114,41 @@ final class Client
     }
 
     /**
+     * A writing call (feature 31), which answers at once instead of queuing. Checked against
+     * the budgets first; what the gateway charged is booked even when it refuses the text
+     * (`422`): the draft, the rewrite and the fact checks ran and were paid for.
+     *
+     * @throws ApiException
+     */
+    public function write(string $op, array $body, string $idempotencyKey, Context $ctx, Estimate $estimate): array
+    {
+        $refusal = (new Ledger())->allow($ctx, $estimate);
+
+        if ($refusal !== null) {
+            throw $refusal === 'balance' ? self::balanceRefusal() : ApiException::refused($refusal);
+        }
+
+        [$status, $data] = $this->exchange('POST', self::path($op), $body, ['Idempotency-Key' => $idempotencyKey], (int) Config::get('gateway.write_timeout', 180));
+        $ok = $status >= 200 && $status < 300;
+        $charged = $ok ? ($data['chargedEur'] ?? 0) : ($data['error']['chargedEur'] ?? 0);
+        $charged = is_numeric($charged) ? (float) $charged : 0.0;
+
+        if ($ok || $charged > 0) {
+            $this->record($ctx, $op, $charged, 'write:' . $idempotencyKey, count((array) ($data['variants'] ?? [])), $estimate->ceiling());
+        }
+
+        if (!$ok) {
+            throw self::failure($status, $data, $charged);
+        }
+
+        if (!is_array($data)) {
+            throw ApiException::transport('invalid JSON');
+        }
+
+        return $data;
+    }
+
+    /**
      * `GET /v1/seo/tasks/{id}`: `{taskId, operation, state: running|done|failed, result?, expired?, chargedEur?, error?}`.
      *
      * @throws ApiException
@@ -179,7 +216,7 @@ final class Client
      * is the reason, retryable where waiting helps, a translated message either way.
      * `error.code` is the machine code where there is one, else `error.type`.
      */
-    public static function failure(int $status, ?array $body): ApiException
+    public static function failure(int $status, ?array $body, float $charged = 0.0): ApiException
     {
         $error = is_array($body['error'] ?? null) ? $body['error'] : [];
         $code = (string) ($error['code'] ?? $error['type'] ?? '');
@@ -191,6 +228,7 @@ final class Client
             $status === 402 => self::balanceRefusal(),
             $status === 400 && $code === 'seo_location_unsupported' => new ApiException(Lang::get('aDataForSeo::global.error_gateway_location', ['detail' => $detail]), 'location', false, 400),
             $status === 404 && $code === 'task_not_found' => new ApiException(Lang::get('aDataForSeo::global.error_gateway_task_gone'), 'task_not_found', false, 404),
+            $status === 422 && in_array($code, ['seo_unsupported_claim', 'seo_no_valid_variant'], true) => new ApiException(Lang::get('aDataForSeo::global.error_writer_' . ($code === 'seo_unsupported_claim' ? 'claim' : 'no_variant'), ['cost' => '€' . number_format($charged, 4)]), 'writer_refused', false, 422),
             $status === 409 => new ApiException(Lang::get('aDataForSeo::global.error_gateway_busy'), 'busy', true, 409),
             $status === 503 => new ApiException(Lang::get('aDataForSeo::global.error_gateway_unavailable'), 'unavailable', true, 503),
             $status >= 400 && $status < 500 && $status !== 408 && $status !== 429 => new ApiException(Lang::get('aDataForSeo::global.error_gateway_invalid', ['detail' => $detail !== '' ? $detail : 'HTTP ' . $status]), 'invalid', false, $status),
@@ -206,6 +244,25 @@ final class Client
      */
     private function request(string $method, string $path, ?array $body = null, array $headers = []): array
     {
+        [$status, $data] = $this->exchange($method, $path, $body, $headers);
+
+        if ($status < 200 || $status >= 300) {
+            throw self::failure($status, $data);
+        }
+
+        if (!is_array($data)) {
+            throw ApiException::transport('invalid JSON');
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array<string, string> $headers
+     * @return array{0: int, 1: ?array} the status and the decoded body, null when it is not JSON
+     */
+    private function exchange(string $method, string $path, ?array $body, array $headers, ?int $timeout = null): array
+    {
         [$status, $raw] = $this->transport->send(
             $method,
             $this->credentials->siteUrl() . '/v1/' . $path,
@@ -216,20 +273,12 @@ final class Client
                 'Accept' => 'application/json',
                 'User-Agent' => 'aDataForSeo/1.0 (Evolution CMS)',
             ],
-            (int) Config::get('gateway.timeout', 60),
+            $timeout ?? (int) Config::get('gateway.timeout', 60),
             (int) Config::get('gateway.connect_timeout', 10)
         );
 
         $data = json_decode($raw, true);
 
-        if ($status < 200 || $status >= 300) {
-            throw self::failure($status, is_array($data) ? $data : null);
-        }
-
-        if (!is_array($data)) {
-            throw ApiException::transport('invalid JSON');
-        }
-
-        return $data;
+        return [$status, is_array($data) ? $data : null];
     }
 }

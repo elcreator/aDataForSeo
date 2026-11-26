@@ -189,6 +189,58 @@
         return h('div', { 'class': 'sx-alert sx-alert-warn' }, h('span', null, [parts[0], link, parts.slice(1).join(':link')]));
     }
 
+    /**
+     * "Suggest with AI" under a title/description fix: the first click asks the price (free),
+     * the second pays for the variants; "Use this" only fills the inputs, Apply still saves.
+     * `subject` is {issue: id} or {target: id}.
+     */
+    function writerBox(subject, inputs) {
+        if (!S.boot.flags.writer_ai || (!inputs.meta_title && !inputs.meta_description)) { return null; }
+        var box = h('div', { 'class': 'sx-writer' });
+        var out = h('div');
+        var quoted = null;
+        var b = btn(t('ui_writer_suggest'), { small: true, icon: 'magic', onclick: function () {
+            b.disabled = true;
+            if (!quoted) {
+                api('POST', '/writer/quote', subject).then(function (r) {
+                    b.disabled = false;
+                    if (!r || r.ok === false) { notice(out, 'error', errMsg(r)); return; }
+                    quoted = r;
+                    b.lastChild.textContent = t('ui_writer_price', { count: 3, price: estimateText(r.estimate, r.currency) });
+                });
+                return;
+            }
+            b.lastChild.textContent = t('ui_writer_writing');
+            api('POST', '/writer/meta', Object.assign({ confirm: true }, subject)).then(function (r) {
+                b.disabled = false;
+                quoted = null;
+                b.lastChild.textContent = t('ui_writer_suggest');
+                clear(out);
+                if (!r || r.ok === false) { notice(out, 'error', errMsg(r)); return; }
+                add(out, h('p', { 'class': 'sx-small sx-muted', text: t('ui_writer_note') + ' ' + t('ui_writer_cost', { cost: money(r.cost, null, r.currency) }) }));
+                (r.warnings || []).forEach(function (w) { add(out, h('div', { 'class': 'sx-alert sx-alert-warn sx-small', text: w.code === 'language_not_evaluated' ? t('ui_writer_language') : w.message })); });
+                if (!(r.variants || []).length) { add(out, h('p', { 'class': 'sx-muted', text: t('ui_writer_none') })); }
+                (r.variants || []).forEach(function (v) {
+                    var keys = [];
+                    (v.claims || []).forEach(function (c) { (c.keys || []).forEach(function (k) { if (keys.indexOf(k) < 0) { keys.push(k); } }); });
+                    add(out, h('div', { 'class': 'sx-variant' }, [
+                        h('div', null, [h('b', { text: v.title }), h('span', { 'class': 'sx-muted sx-small', text: ' · ' + v.title_chars })]),
+                        v.description ? h('div', { 'class': 'sx-small' }, [v.description, h('span', { 'class': 'sx-muted', text: ' · ' + v.description_chars })]) : null,
+                        keys.length ? h('div', { 'class': 'sx-small sx-muted', text: t('ui_writer_sources', { keys: keys.join(', ') }) }) : null,
+                        btn(t('ui_writer_use'), { small: true, icon: 'check', onclick: function () {
+                            if (inputs.meta_title) { inputs.meta_title.value = v.title; }
+                            if (inputs.meta_description && v.description) { inputs.meta_description.value = v.description; }
+                            live(t('ui_writer_use'));
+                        } })
+                    ]));
+                });
+            });
+        } });
+        add(box, b);
+        add(box, out);
+        return box;
+    }
+
     /** The DataForSEO sign-up: an affiliate link, marked as an ad and disclosed, opened in a new tab. */
     function tryButton() {
         if (!CFG.signup) { return null; }

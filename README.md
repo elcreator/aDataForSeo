@@ -81,6 +81,13 @@ in the environment also work.
   own DataForSEO account (DataForSEO's terms keep keyword and search-result records out of resale); the module says so
   instead of failing. The gateway address is `gateway.url` in the configuration.
 
+**Titles and descriptions written by AI** (optional, off by default): in Settings, set "Title and description
+suggestions" to ai.artur.work. Every title or description fix then gets a **Suggest with AI** button. The first click
+shows the price, the second writes three variants from the page's own data (its search, title, text, place, the pages
+next to it). The gateway rejects a variant that states a figure or name the page does not have. **Use this** only fills the
+field; nothing is saved until you click Apply. It is paid in euros from the ai.artur.work key, whichever way the site
+pays for its analytics (about €0.001 per page).
+
 ## Money rules
 
 - **No call without a price.** Prices come from DataForSEO's own price table

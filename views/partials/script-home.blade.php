@@ -241,6 +241,7 @@
                     inputs[ch.field] = edit;
                     body.push(h('div', { 'class': 'sx-diff' }, [h('span', { 'class': 'sx-muted', text: t('field_' + ch.field) === 'field_' + ch.field ? ch.field : t('field_' + ch.field) }), h('div', null, [ch.before ? h('div', { 'class': 'sx-before', text: ch.before }) : h('div', { 'class': 'sx-muted', text: t('ui_empty_value') }), edit])]));
                 });
+                if (r.fix === 'seo_fields' && r.available) { var wb = writerBox({ issue: item.id }, inputs); if (wb) { body.push(wb); } }
             }
             var m;
             var actions = [];

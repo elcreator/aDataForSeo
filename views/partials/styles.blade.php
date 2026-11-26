@@ -150,6 +150,9 @@
     .sx-diff { display: grid; grid-template-columns: 9rem 1fr; gap: .25rem .75rem; font-size: .85rem; }
     .sx-diff .sx-before { color: var(--sx-danger); text-decoration: line-through; word-break: break-word; }
     .sx-diff .sx-after { color: var(--sx-ok); word-break: break-word; }
+    .sx-writer { margin-top: .75rem; display: grid; gap: .5rem; }
+    .sx-variant { display: grid; gap: .25rem; padding: .5rem .75rem; border: 1px solid var(--sx-border); border-radius: 4px; word-break: break-word; }
+    .sx-variant .sx-btn { justify-self: start; }
     .sx-empty { text-align: center; padding: 2.5rem 1rem; color: var(--sx-muted); }
     .sx-empty i { font-size: 2rem; display: block; margin-bottom: .5rem; }
     .sx-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

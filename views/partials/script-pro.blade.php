@@ -96,6 +96,7 @@
                     body.push(h('div', { 'class': 'sx-diff' }, [h('span', { 'class': 'sx-muted', text: t('field_' + ch.field) }), h('div', null, [ch.before ? h('div', { 'class': 'sx-before', text: ch.before }) : null, inputs[ch.field]])]));
                 });
                 if (!(r.changes || []).length) { body.push(h('p', { 'class': 'sx-muted', text: t('ui_nothing_to_change') })); }
+                if (S.boot.flags.sseo && (r.changes || []).length) { var wb = writerBox({ target: tg.id }, inputs); if (wb) { body.push(wb); } }
             }
             var m = modal(t('ui_apply_title'), body, S.boot.flags.sseo && r && r.ok !== false && r.changes.length ? [btn(t('ui_apply'), { primary: true, icon: 'check', onclick: function (b) {
                 b.disabled = true;
