@@ -96,6 +96,13 @@ it('runs the audit and maps findings to documents', function () {
         ->and(Issue::query()->where('source', 'audit')->whereNotNull('document_id')->count())->toBeGreaterThan(0)
         ->and(Issue::query()->where('code', 'redirect_chain')->count())->toBe(1);
 
+    // 200 pages charged at post, the pages not crawled come back: the crawl costs what it read.
+    $crawl = \Elcreator\aDataForSeo\Models\Step::query()->where('job_id', $job->id)->where('name', 'crawl')->first();
+    $crawled = (int) $job->result['audit']['pages_crawled'];
+    expect($crawled)->toBeLessThan(200)
+        ->and((float) $crawl->cost)->toBeGreaterThan(0.0)->toBeLessThanOrEqual(0.00015 * $crawled + 1e-9)
+        ->and(\Elcreator\aDataForSeo\Models\Call::query()->where('job_id', $job->id)->where('cost', '<', 0)->count())->toBe(1);
+
     // A short title gets a longer suggestion; a page without a canonical gets its own address.
     $short = Issue::query()->where('code', 'title_too_short')->whereNotNull('document_id')->first();
     $canonical = Issue::query()->where('code', 'no_canonical')->whereNotNull('document_id')->first();

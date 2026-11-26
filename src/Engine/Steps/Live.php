@@ -14,6 +14,10 @@ use Elcreator\aDataForSeo\Models\Step;
  * `ref` names a post step whose first task id replaces `{id}` in the endpoint
  * and payload. A `deferred` step's tasks are written by an earlier analyser;
  * when it wrote none, the step is skipped.
+ *
+ * The summary of a finished crawl is where an OnPage refund shows: the post
+ * charged every page of `max_crawl_pages`, DataForSEO gives back the pages it
+ * did not crawl (measured 2026-11-26: 1 of 100 pages cost $0.00015 of $0.015).
  */
 final class Live extends StepRunner
 {
@@ -57,6 +61,10 @@ final class Live extends StepRunner
 
             if ($response->ok()) {
                 $responses[(string) $i] = $rt->store($step, $response, (string) $i);
+
+                if (str_starts_with($step->endpoint, 'on_page/summary') && !$response->cached && $ref !== null) {
+                    self::takeCrawlRefund($rt, $rt->step((string) $step->param('ref')), $ref, (array) ($response->task()['result'][0] ?? []));
+                }
             } else {
                 $first = $response->task();
                 $errors[(string) $i] = ['code' => (int) ($first['status_code'] ?? 0), 'message' => mb_substr((string) ($first['status_message'] ?? ''), 0, 200)];
@@ -70,5 +78,26 @@ final class Live extends StepRunner
         }
 
         return Outcome::done();
+    }
+
+    /**
+     * Book the refund for pages not crawled once: the posted cost scales with the pages, so
+     * the final one is posted x crawled / max, at least one page. The task keeps the final cost.
+     */
+    private static function takeCrawlRefund(Runtime $rt, ?Step $post, string $id, array $summary): void
+    {
+        $ids = (array) ($post?->dfs_task_ids ?? []);
+        $posted = (float) ($ids[$id]['cost'] ?? 0);
+        $max = (int) ($summary['crawl_status']['max_crawl_pages'] ?? 0);
+        $crawled = $summary['crawl_status']['pages_crawled'] ?? null;
+
+        if ($post === null || $posted <= 0 || ($summary['crawl_progress'] ?? '') !== 'finished' || $max <= 0 || !is_numeric($crawled) || (int) $crawled >= $max) {
+            return;
+        }
+
+        $final = $posted * max(1, (int) $crawled) / $max;
+        $rt->client()->refund($rt->contextFor($post), (string) $post->endpoint, $posted - $final);
+        $ids[$id]['cost'] = round($final, 6);
+        $post->forceFill(['dfs_task_ids' => $ids])->save();
     }
 }

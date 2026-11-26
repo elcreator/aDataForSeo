@@ -60,8 +60,11 @@ ci/ .github/                 full CMS with the plugin inside (Docker), smoke tes
 - **A SERP shorter than its `depth` is refunded**: `task_post` charges the full depth, DataForSEO gives back the
   results it could not deliver, and `task_get` reports the final cost in `tasks[0].cost` (measured 2026-11-26:
   `site:` at depth 100 was $0.03 at post, $0.003 in `task_get` and in DataForSEO's own statistics). Book
-  `posted - final` once as a negative ledger row on the posting step (`Engine\Steps\Fetch`). DataForSEO states the
-  same rule for OnPage `max_crawl_pages`; two audits that day showed no refund, so it is not booked yet.
+  `posted - final` once as a negative ledger row on the posting step (`Engine\Steps\Fetch`). **OnPage too**: a crawl
+  below `max_crawl_pages` gets the unused pages back when it finishes (measured 2026-11-26: 1 page of 100 cost
+  $0.00015 of the $0.015 posted). The summary's `cost` is 0, so the final cost is posted × `pages_crawled` /
+  `max_crawl_pages`, booked by `Engine\Steps\Live` on the summary step. `on_page/id_list` and `serp/id_list` (free)
+  list every task's final `cost`: the place to check a ledger against DataForSEO.
 - **A SERP keyword with a search operator** (`site:`, `intitle:`, `inurl:` ...) **costs five times the base price**
   on every 10 results: `site:` at depth 100 is $0.03, not $0.006 (`Api\Estimator::serpUnits()`).
 - **Task-level status codes**: `20000` ok, `20100` task created. The HTTP status can be 200 while a task failed;

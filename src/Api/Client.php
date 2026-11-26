@@ -133,6 +133,12 @@ final class Client
         return new Response($data, false, (int) $call->getKey(), $cost);
     }
 
+    /** Book DataForSEO's refund for a task already paid, under this client's environment. */
+    public function refund(Context $ctx, string $endpoint, float $amount): void
+    {
+        $this->ledger->refund($ctx, Endpoints::normalise($endpoint), $amount, ['env' => $this->env]);
+    }
+
     /** `appendix/user_data`: balance, prices, subscriptions. Free; not cached. */
     public function userData(): array
     {

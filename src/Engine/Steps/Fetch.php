@@ -89,7 +89,7 @@ final class Fetch extends StepRunner
             return;
         }
 
-        $rt->client()->ledger()->refund($rt->contextFor($post), rtrim($step->endpoint, '/'), $posted - (float) $final);
+        $rt->client()->refund($rt->contextFor($post), rtrim($step->endpoint, '/'), $posted - (float) $final);
         $task['cost'] = (float) $final;
     }
 }
