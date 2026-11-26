@@ -68,6 +68,9 @@ const ADFS_AUDIT = [
         ['code' => 'title_duplicate', 'severity' => 'medium', 'url' => 'https://example.test/kontakty', 'details' => ['pages' => 2]],
         ['code' => 'canonical_missing', 'severity' => 'low', 'url' => 'https://example.test/kontakty', 'details' => []],
         ['code' => 'hreflang_no_self', 'severity' => 'low', 'url' => 'https://example.test/kontakty', 'details' => []],
+        ['code' => 'title_too_short', 'severity' => 'low', 'url' => 'https://example.test/kontakty', 'details' => ['length' => 4]],
+        ['code' => 'hreflang_invalid', 'severity' => 'medium', 'url' => 'https://example.test/kontakty', 'details' => ['codes' => ['cz']]],
+        ['code' => 'image_too_heavy', 'severity' => 'low', 'url' => 'https://example.test/kontakty', 'details' => []],
         ['code' => 'broken_link', 'severity' => 'medium', 'url' => 'https://example.test/kontakty', 'details' => ['to' => 'https://example.test/nikde', 'status' => 404]],
     ],
 ];
@@ -282,7 +285,13 @@ describe('a gateway job, end to end', function () {
         expect($title->document_id)->not->toBeNull()->and($title->fix)->toBe('seo_fields')->and($title->severity)->toBe('high')
             ->and($broken->fix)->toBe('redirect')->and($broken->details['suggest']['new_url'])->toBe('https://example.test/')
             ->and(Issue::query()->where('code', 'duplicate_title')->count())->toBe(1)
-            ->and($other->fix)->toBe('manual')->and($other->details['gateway_codes'])->toBe(['canonical_missing', 'hreflang_no_self'])
+            ->and($other->fix)->toBe('manual')->and($other->details['gateway_codes'])->toBe(['image_too_heavy'])
+            ->and(Issue::query()->where('code', 'title_too_short')->first()->fix)->toBe('seo_fields')
+            ->and(Issue::query()->where('code', 'title_too_short')->first()->details['suggest']['meta_title'])->toBe('Kontakty | Example Realty')
+            ->and(Issue::query()->where('code', 'no_canonical')->first()->fix)->toBe('seo_fields')
+            ->and(Issue::query()->where('code', 'no_canonical')->first()->details['suggest']['canonical_url'])->toStartWith('https://example.test/kontakty')
+            ->and(Issue::query()->where('code', 'hreflang_no_self')->first()->fix)->toBe('manual')
+            ->and(Issue::query()->where('code', 'bad_hreflang')->first()->details)->toBe(['codes' => ['cz']])
             ->and($link->url)->toBe('https://example.test/kontakty → https://example.test/nikde');
     });
 

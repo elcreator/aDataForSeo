@@ -95,6 +95,14 @@ it('runs the audit and maps findings to documents', function () {
         ->and(Issue::query()->where('code', 'broken_page')->first()?->fix)->toBe('redirect')
         ->and(Issue::query()->where('source', 'audit')->whereNotNull('document_id')->count())->toBeGreaterThan(0)
         ->and(Issue::query()->where('code', 'redirect_chain')->count())->toBe(1);
+
+    // A short title gets a longer suggestion; a page without a canonical gets its own address.
+    $short = Issue::query()->where('code', 'title_too_short')->whereNotNull('document_id')->first();
+    $canonical = Issue::query()->where('code', 'no_canonical')->whereNotNull('document_id')->first();
+    expect($short?->fix)->toBe('seo_fields')
+        ->and(mb_strlen((string) $short->details['suggest']['meta_title']))->toBeGreaterThan(mb_strlen('Welcome'))
+        ->and($canonical?->fix)->toBe('seo_fields')
+        ->and($canonical->details['suggest']['canonical_url'])->toBe($canonical->url);
 });
 
 it('runs research, difficulty, tracking and competitors in order', function () {

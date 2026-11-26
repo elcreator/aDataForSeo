@@ -439,8 +439,8 @@ final class DemoTransport implements Transport
                 $title = $h % 5 === 0 ? '' : ($h % 5 === 1 ? 'Welcome' : 'Page ' . ($i + 1) . ' — ' . self::host());
                 $items[] = [
                     'url' => $url, 'status_code' => 200, 'resource_type' => 'html',
-                    'meta' => ['title' => $title, 'description' => $h % 3 === 0 ? '' : 'Description of page ' . ($i + 1), 'canonical' => $url, 'htags' => ['h1' => $h % 4 === 0 ? [] : ['Heading']]],
-                    'checks' => ['no_title' => $title === '', 'no_description' => $h % 3 === 0, 'title_too_long' => false, 'no_h1_tag' => $h % 4 === 0,
+                    'meta' => ['title' => $title, 'description' => $h % 3 === 0 ? '' : 'Description of page ' . ($i + 1), 'canonical' => $h % 5 === 1 || $h % 6 === 1 ? null : $url, 'htags' => ['h1' => $h % 4 === 0 ? [] : ['Heading']]],
+                    'checks' => ['no_title' => $title === '', 'no_description' => $h % 3 === 0, 'title_too_long' => false, 'title_too_short' => $title === 'Welcome', 'no_h1_tag' => $h % 4 === 0,
                         'is_4xx_code' => false, 'is_orphan_page' => $h % 7 === 0, 'canonical_to_redirect' => false],
                 ];
             }

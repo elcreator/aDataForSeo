@@ -30,10 +30,15 @@ final class AuditResult extends Analyser
         'internal_redirect' => 'internal_redirect',
         'title_missing' => 'empty_title',
         'title_too_long' => 'title_too_long',
+        'title_too_short' => 'title_too_short',
         'description_missing' => 'empty_description',
         'h1_missing' => 'no_h1',
         'canonical_broken' => 'bad_canonical',
         'canonical_foreign' => 'bad_canonical',
+        'canonical_missing' => 'no_canonical',
+        'duplicate_content' => 'duplicate_content',
+        'hreflang_invalid' => 'bad_hreflang',
+        'hreflang_no_self' => 'hreflang_no_self',
         'orphan_page' => 'orphan_page',
         'title_duplicate' => 'duplicate_title',
         'description_duplicate' => 'duplicate_description',
@@ -101,7 +106,7 @@ final class AuditResult extends Analyser
     private function issue(string $code, string $url, array $details, string $given, UrlMap $map, string $siteName, string $siteUrl): array
     {
         // The gateway's own severity is the better judge of what it found; the table covers an answer without one.
-        $severity = isset(IssueBook::SEVERITIES[$given]) ? $given : ['broken_page' => 'high', 'server_error' => 'high', 'empty_title' => 'high', 'redirect_loop' => 'high', 'empty_description' => 'medium', 'title_too_long' => 'low', 'no_h1' => 'low', 'orphan_page' => 'low', 'internal_redirect' => 'low'][$code] ?? 'medium';
+        $severity = isset(IssueBook::SEVERITIES[$given]) ? $given : ['broken_page' => 'high', 'server_error' => 'high', 'empty_title' => 'high', 'redirect_loop' => 'high', 'empty_description' => 'medium', 'title_too_long' => 'low', 'title_too_short' => 'low', 'no_canonical' => 'low', 'hreflang_no_self' => 'low', 'no_h1' => 'low', 'orphan_page' => 'low', 'internal_redirect' => 'low'][$code] ?? 'medium';
 
 
         if ($code === 'broken_link') {
@@ -121,12 +126,26 @@ final class AuditResult extends Analyser
             'broken_page' => ['code' => $code, 'severity' => $severity, 'fix' => 'redirect', 'details' => ['status' => $details['status'] ?? null, 'suggest' => ['new_url' => Audit::nearestParent($url, $map, $siteUrl)]]],
             'empty_title', 'title_too_long', 'duplicate_title' => Audit::seo($code, $severity, $doc, $lang, ['meta_title' => $document ? Writer::title($document, $siteName) : ''], array_intersect_key($details, ['length' => 1, 'pages' => 1])),
             'empty_description', 'duplicate_description' => Audit::seo($code, $severity, $doc, $lang, ['meta_description' => $document ? Writer::description($document) : ''], array_intersect_key($details, ['pages' => 1])),
+            // A suggestion no longer than the title Google saw would not fix anything: then it is manual.
+            'title_too_short' => Audit::seo($code, $severity, $doc, $lang, ['meta_title' => self::longer($document ? Writer::title($document, $siteName) : '', (int) ($details['length'] ?? 0))], array_intersect_key($details, ['length' => 1])),
             'bad_canonical' => Audit::seo($code, $severity, $doc, $lang, ['canonical_url' => $url]),
+            'no_canonical' => Audit::seo($code, $severity, $doc, $lang, ['canonical_url' => self::absolute((string) ($resource['url'] ?? ''), $url)]),
             // Only a "noindex" the page itself carries can be lifted through its SEO fields; a robots.txt rule is manual.
             'non_indexable' => str_contains(strtolower((string) ($details['reason'] ?? '')), 'meta') && $doc !== null
                 ? Audit::seo($code, $severity, $doc, $lang, ['robots' => 'index,follow'], ['reason' => (string) $details['reason']])
                 : ['code' => $code, 'severity' => $severity, 'fix' => 'manual', 'details' => ['reason' => (string) ($details['reason'] ?? '')]],
-            default => ['code' => $code, 'severity' => $severity, 'fix' => 'manual', 'details' => array_intersect_key($details, ['status' => 1, 'to' => 1, 'hops' => 1])],
+            default => ['code' => $code, 'severity' => $severity, 'fix' => 'manual', 'details' => array_intersect_key($details, ['status' => 1, 'to' => 1, 'hops' => 1, 'codes' => 1])],
         };
+    }
+
+    private static function longer(string $suggested, int $current): string
+    {
+        return mb_strlen($suggested) > $current ? $suggested : '';
+    }
+
+    /** The document's own address when the map knows it absolutely, else the address that was crawled. */
+    private static function absolute(string $own, string $crawled): string
+    {
+        return preg_match('#^https?://#i', $own) ? $own : $crawled;
     }
 }

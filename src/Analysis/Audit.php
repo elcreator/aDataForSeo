@@ -76,6 +76,9 @@ final class Audit extends Analyser
                 $issues[] = $base + self::seo('empty_title', 'high', $doc, $lang, ['meta_title' => $document ? Writer::title($document, $siteName) : '']);
             } elseif (!empty($checks['title_too_long']) || mb_strlen($title) > 70) {
                 $issues[] = $base + self::seo('title_too_long', 'low', $doc, $lang, ['meta_title' => Writer::cut($title, Writer::TITLE_MAX)], ['length' => mb_strlen($title), 'current' => $title]);
+            } elseif (!empty($checks['title_too_short'])) {
+                $suggest = $document ? Writer::title($document, $siteName) : '';
+                $issues[] = $base + self::seo('title_too_short', 'low', $doc, $lang, ['meta_title' => mb_strlen($suggest) > mb_strlen($title) ? $suggest : ''], ['length' => mb_strlen($title), 'current' => $title]);
             }
 
             if (!empty($checks['no_description']) || $description === '') {
@@ -88,6 +91,9 @@ final class Audit extends Analyser
 
             if (!empty($checks['canonical_to_redirect']) || !empty($checks['canonical_to_broken'])) {
                 $issues[] = $base + self::seo('bad_canonical', 'medium', $doc, $lang, ['canonical_url' => $url], ['current' => (string) ($meta['canonical'] ?? '')]);
+            } elseif (array_key_exists('canonical', $meta) && trim((string) $meta['canonical']) === '') {
+                // OnPage reports `canonical: null` for a page without one; a page it did not parse has no key.
+                $issues[] = $base + self::seo('no_canonical', 'low', $doc, $lang, ['canonical_url' => $url]);
             }
 
             if (!empty($checks['is_orphan_page'])) {
