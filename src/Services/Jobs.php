@@ -92,7 +92,16 @@ final class Jobs
         }
 
         $job->save();
-        $estimate = Planner::persist($job, $definitions, $client->estimator());
+
+        try {
+            $estimate = Planner::persist($job, $definitions, $client->estimator());
+        } catch (\Throwable $e) {
+            // A price that could not be asked (gateway down, timeout) must not leave a half-planned draft behind.
+            $this->discard($job);
+
+            throw $e;
+        }
+
         $caps = Projects::caps($project);
         $ledger = new Ledger();
         $ceiling = $estimate->ceiling();

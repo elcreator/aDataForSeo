@@ -100,9 +100,11 @@
         add(panel, err);
         var total = null;
         Promise.all(['coverage', 'audit'].map(function (k) { return api('POST', '/jobs/estimate', { kind: k, options: {} }); })).then(function (rs) {
-            var unknown = rs.some(function (r) { return !r || r.ok === false || r.estimate.unknown; });
+            var failed = rs.filter(function (r) { return !r || r.ok === false || !r.estimate; });
+            var unknown = failed.length > 0 || rs.some(function (r) { return r.estimate.unknown; });
             total = unknown ? null : rs.reduce(function (s, r) { return s + Number(r.estimate.high || r.estimate.amount); }, 0);
             estimate.textContent = t('ui_wiz_first_run', { price: total === null ? t('ui_price_unknown') : money(total, null, S.boot.currency) });
+            if (failed.length) { notice(err, 'error', errMsg(failed[0])); }
         });
         add(panel, h('div', { 'class': 'sx-toolbar' }, [btn(t('ui_back'), { onclick: function () { w.step = 2; R.wizard(); } }), btn(t('ui_wiz_run'), { primary: true, icon: 'play', disabled: !S.boot.flags.may_spend, onclick: function (b) {
             b.disabled = true;

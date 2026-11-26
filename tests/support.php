@@ -448,6 +448,9 @@ final class AdfsFakeGateway implements Transport
     /** Answer the next submits with this status and error envelope (a refusal), then forget it. @var array{0: int, 1: array}|null */
     public ?array $refuse = null;
 
+    /** Answer every quote with this status and error envelope (the gateway cannot price right now). @var array{0: int, 1: array}|null */
+    public ?array $quoteFailure = null;
+
     public function __construct(array $results = [])
     {
         $this->results = $results;
@@ -472,6 +475,10 @@ final class AdfsFakeGateway implements Transport
             $op = $m[1];
 
             if (!empty($data['quote'])) {
+                if ($this->quoteFailure !== null) {
+                    return [$this->quoteFailure[0], json_encode(['type' => 'error', 'error' => $this->quoteFailure[1]])];
+                }
+
                 [$low, $high] = $this->quotes[$op] ?? [0.01, 0.02];
 
                 return [200, json_encode(['object' => 'seo.quote', 'operation' => $op, 'low' => $low, 'high' => $high, 'currency' => 'EUR'])];

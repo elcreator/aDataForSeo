@@ -108,7 +108,12 @@
             opts.body = JSON.stringify(body || {});
         }
         return fetch(BASE + path, opts).then(function (r) {
-            return r.json().catch(function () { return { ok: false, error: 'http', message: t('error_http_page', { status: r.status }) }; });
+            var failed = { ok: false, error: 'http', message: t('error_http_page', { status: r.status }) };
+            return r.json().then(function (data) {
+                // A proxy or the CMS can answer an error status with JSON that is not ours.
+                if (r.ok) { return data; }
+                return data && data.ok === false ? data : Object.assign({}, failed, data && data.message ? { message: String(data.message) } : null, { ok: false });
+            }, function () { return failed; });
         }).catch(function () { return { ok: false, error: 'network', message: t('error_network') }; });
     }
     function errMsg(r) {

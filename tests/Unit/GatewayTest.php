@@ -186,6 +186,28 @@ describe('quotes, approval and budgets', function () {
         expect($job->status)->toBe(Job::DONE, (string) $job->error)->and($gateway->submits('audit'))->toBe(1);
     });
 
+    it('leaves no draft job behind when the gateway cannot quote, and says why through the page', function () {
+        $project = adfsGatewayProject();
+        $gateway = adfsGateway();
+        $gateway->quoteFailure = [503, adfsGatewayError('api_error', 'SEO data is temporarily unavailable. Nothing was charged.', 'seo_unavailable')];
+
+        expect(fn () => (new Jobs())->start('coverage', $project, [], Actor::for(7)))->toThrow(ApiException::class)
+            ->and(Job::query()->count())->toBe(0)->and(Step::query()->count())->toBe(0)
+            ->and($gateway->submits())->toBe(0);
+
+        AdfsTestCore::$loginUserId = 7;
+        $response = (new \Elcreator\aDataForSeo\Http\Controllers\JobController())->estimate(Request::create('/jobs/estimate', 'POST', ['kind' => 'coverage']));
+        $body = adfsGatewayJson($response);
+
+        expect($response->getStatusCode())->toBe(502)->and($body['ok'])->toBeFalse()->and($body['error'])->toBe('unavailable')
+            ->and($body['message'])->not->toBe('');
+
+        // Once the gateway prices again, the same click starts the job.
+        $gateway->quoteFailure = null;
+
+        expect((new Jobs())->start('coverage', $project, [], Actor::for(7))->status)->toBe(Job::QUEUED);
+    });
+
     it('refuses over the job cap and the monthly cap in euros, and only counts euros against them', function () {
         $project = adfsGatewayProject(['job_cap' => 0.05, 'monthly_cap' => 1.0, 'approve_above' => 5.0]);
         $gateway = adfsGateway();
