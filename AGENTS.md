@@ -17,7 +17,7 @@ data, an API explorer, exports and MCP tools. Work runs in the background on the
 **Built** (2026-11-10): Waves 1–4, MCP tools and the template Writer of Wave 5. **Gateway mode** (2026-11-12): pay from the ai.artur.work
 balance for coverage, audit and difficulty (`src/Gateway/`, `docs/DESIGN.md` "Gateway mode"). Not yet: the `gateway` Writer driver, local pack, AI visibility, backlinks. The offline `demo` env
 (`Api\DemoTransport`) answers in DataForSEO's real shapes and drives the end-to-end tests and `adfs:demo`.
-`docs/DESIGN.md` lists the files each wave owns.
+`docs/DESIGN.md` lists the files each wave owns. **What is left to build: `docs/TODO.md`.**
 
 ## Planned layout
 
