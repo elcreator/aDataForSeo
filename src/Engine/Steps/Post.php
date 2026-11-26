@@ -97,7 +97,8 @@ final class Post extends StepRunner
                 $index = $indexes[$position] ?? $position;
 
                 if (Response::taskOk($task) && isset($task['id'])) {
-                    $ids[(string) $task['id']] = ['state' => 'posted', 'index' => $index];
+                    // The price at post: task_get reports less when DataForSEO refunds undelivered results.
+                    $ids[(string) $task['id']] = ['state' => 'posted', 'index' => $index, 'cost' => (float) ($task['cost'] ?? 0)];
                 } else {
                     $errors[] = ['index' => $index, 'code' => (int) ($task['status_code'] ?? 0), 'message' => mb_substr((string) ($task['status_message'] ?? ''), 0, 200)];
                 }

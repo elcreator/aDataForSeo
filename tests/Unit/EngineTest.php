@@ -113,6 +113,33 @@ it('never pays twice: a re-run step keeps its posted ids, and a crashed post fin
     expect(array_keys($post->refresh()->dfs_task_ids))->toBe(['paid-1'])->and($recover->count('#task_post$#'))->toBe(0);
 });
 
+it('books the refund of a SERP shorter than its depth once, on the posting step', function () {
+    adfsUser(7);
+    adfsUseKey();
+    // Charged $0.03 at post; task_get reports the final $0.003 after DataForSEO's refund.
+    $transport = new AdfsFakeTransport([
+        '#task_post$#' => fn ($m, $p, $tasks) => adfsEnvelope([adfsTask([], $tasks[0], 20100, 0.03, 'dfs-0')], 0.03),
+        '#tasks_ready$#' => fn () => adfsEnvelope([adfsTask([['id' => 'dfs-0', 'tag' => 'x']])]),
+        '#task_get#' => fn () => adfsEnvelope([adfsTask([['items' => [['type' => 'organic', 'rank_group' => 1, 'url' => 'https://example.test/', 'title' => 'Home']]]], ['keyword' => 'site:example.test'], 20000, 0.003)], 0.003),
+    ]);
+    Client::useTransport($transport);
+    $job = adfsSerpJob(7, [['keyword' => 'site:example.test', 'location_code' => 2203, 'language_code' => 'cs', 'depth' => 10]]);
+
+    adfsDrive($job);
+    $post = Step::query()->where('job_id', $job->id)->where('name', 's')->first();
+    $fetch = Step::query()->where('job_id', $job->id)->where('kind', 'fetch')->first();
+
+    expect($job->refresh()->status)->toBe(Job::DONE)
+        ->and(round((float) $job->spent, 6))->toBe(0.003)
+        ->and(round((float) \Elcreator\aDataForSeo\Models\Call::query()->where('job_id', $job->id)->sum('cost'), 6))->toBe(0.003)
+        ->and(\Elcreator\aDataForSeo\Models\Call::query()->where('cost', '<', 0)->count())->toBe(1)
+        ->and(round((float) $post->cost, 6))->toBe(0.003);
+
+    // The same fetch run again asks nothing and books nothing.
+    \Elcreator\aDataForSeo\Engine\Steps\StepRunner::for('fetch')->run($fetch, new \Elcreator\aDataForSeo\Engine\Runtime($job, $job->project, new Client(Keys::for(\Elcreator\aDataForSeo\Support\Principal::forUser(7))), new \Elcreator\aDataForSeo\Api\Context(1, $job->id)));
+    expect(\Elcreator\aDataForSeo\Models\Call::query()->where('cost', '<', 0)->count())->toBe(1);
+});
+
 it('stops within its time budget and asks for a successor', function () {
     adfsUser(7);
     adfsUseKey();

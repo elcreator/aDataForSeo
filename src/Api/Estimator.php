@@ -53,7 +53,7 @@ final class Estimator
         }
 
         if ($perResult <= 0) {
-            return Estimate::exact($perRequest * $taskCount);
+            return Estimate::exact($perRequest * (Endpoints::family($endpoint) === 'serp' ? self::serpUnits($tasks) : $taskCount));
         }
 
         $items = $expectItems ?? self::expectedItems($endpoint, $tasks);
@@ -65,6 +65,21 @@ final class Estimator
         }
 
         return Estimate::exact($perRequest * $taskCount + $perResult * $items);
+    }
+
+    /**
+     * Base prices a SERP batch costs: a keyword with a search operator (`site:`, `intitle:` ...)
+     * is billed five times over (measured November 2026: `site:` at depth 100 was $0.03, not $0.006).
+     */
+    public static function serpUnits(array $tasks): int
+    {
+        $units = 0;
+
+        foreach ($tasks as $task) {
+            $units += preg_match('/(?:^|\s)(?:allinanchor|allintext|allintitle|allinurl|define|filetype|id|inanchor|info|intext|intitle|inurl|link|site):/i', (string) ($task['keyword'] ?? '')) === 1 ? 5 : 1;
+        }
+
+        return max(1, $units);
     }
 
     /** The largest `depth` among the tasks, if any asks for one. */

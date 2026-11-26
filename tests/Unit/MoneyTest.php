@@ -64,6 +64,14 @@ describe('Estimator', function () {
         expect($estimate->amount)->toBe(0.0012)->and($estimate->exact)->toBeTrue();
     });
 
+    it('prices a SERP keyword with a search operator at five times the base', function () {
+        $estimate = adfsEstimator()->estimate('serp/google/organic/task_post', [['keyword' => 'site:example.test', 'depth' => 10], ['keyword' => 'website: tips', 'depth' => 10]]);
+
+        expect($estimate->amount)->toBe(round(0.0006 * 6, 6))
+            ->and(Estimator::serpUnits([['keyword' => 'kids camp INTITLE:prague']]))->toBe(5)
+            ->and(Estimator::serpUnits([['keyword' => 'https://example.test']]))->toBe(1);
+    });
+
     it('adds per result times the expected items', function () {
         $estimate = adfsEstimator()->estimate('dataforseo_labs/google/keyword_suggestions/live', [['keyword' => 'byty atlantida', 'limit' => 100]]);
 

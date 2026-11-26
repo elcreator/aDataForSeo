@@ -55,8 +55,15 @@ ci/ .github/                 full CMS with the plugin inside (Docker), smoke tes
   appendix of `docs/DESIGN.md` is a snapshot for tests and sanity checks only.
 - **Every response carries `cost`** (top level). It is the truth for the ledger; estimates are for gating only.
   **Except `task_get`**: it echoes the price of the task already charged at `task_post` (verified against the account
-  balance: 283 SERP fetches reported $0.17 that was never charged again). Record `task_get` as 0, or every queued task
-  is counted twice. Reconcile the ledger with `user_data` → `money.balance` periodically.
+  balance: 283 SERP fetches reported $0.17 that was never charged again). Never add `task_get` to the ledger, or every
+  queued task is counted twice. Reconcile the ledger with `user_data` → `money.balance` periodically.
+- **A SERP shorter than its `depth` is refunded**: `task_post` charges the full depth, DataForSEO gives back the
+  results it could not deliver, and `task_get` reports the final cost in `tasks[0].cost` (measured 2026-11-26:
+  `site:` at depth 100 was $0.03 at post, $0.003 in `task_get` and in DataForSEO's own statistics). Book
+  `posted - final` once as a negative ledger row on the posting step (`Engine\Steps\Fetch`). DataForSEO states the
+  same rule for OnPage `max_crawl_pages`; two audits that day showed no refund, so it is not booked yet.
+- **A SERP keyword with a search operator** (`site:`, `intitle:`, `inurl:` ...) **costs five times the base price**
+  on every 10 results: `site:` at depth 100 is $0.03, not $0.006 (`Api\Estimator::serpUnits()`).
 - **Task-level status codes**: `20000` ok, `20100` task created. The HTTP status can be 200 while a task failed;
   always read `tasks[i].status_code`.
 - **Live vs queue**: Labs is live-only. SERP, OnPage and Keywords Data have `task_post` → `tasks_ready` → `task_get`
@@ -78,7 +85,8 @@ ci/ .github/                 full CMS with the plugin inside (Docker), smoke tes
 - **A new site has no `ranked_keywords`** (empty result, not an error). Show demand and opportunities instead of
   zeros.
 - **`site:<domain>` through SERP is the cheapest health check** and was the most important finding on the reference
-  site (0 of 65 landing pages indexed). `depth` above 10 costs more; estimate from the ledger's history.
+  site (0 of 65 landing pages indexed). `depth` above 10 costs more; estimate from the ledger's history. Through the
+  gateway it is a range: one block of 10 results × 5 (a site Google barely lists) up to the full depth × 5.
 - **Ads `search_volume`** costs the same for 1 or 1000 keywords: batch. `keywords_for_keywords` takes ≤ 20 seeds.
 - **Sandbox** `https://sandbox.dataforseo.com/v3/` is free for registered users, returns dummy data in the real shapes,
   covers SERP, Keywords Data, Labs, OnPage, Backlinks and more. Use it for the demo mode, CI and tests.

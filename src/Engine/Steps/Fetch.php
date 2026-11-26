@@ -11,7 +11,7 @@ use Elcreator\aDataForSeo\Models\Step;
  * `task_get/<variant>/<id>` (free) for every ready id; each answer is stored
  * for the job. A task that is ready only on paper (40601 handed, 40602 in
  * queue) goes back to `retry` and is asked again after a back-off. A fetched
- * id is never fetched again.
+ * id is never fetched again, so a refund it reports is booked once.
  */
 final class Fetch extends StepRunner
 {
@@ -51,6 +51,7 @@ final class Fetch extends StepRunner
             if ($response->ok()) {
                 $responses[(string) $id] = $rt->store($step, $response, (string) $id);
                 $ids[$id]['state'] = 'fetched';
+                self::takeRefund($rt, $post, $step, $ids[$id], $first, $response->cached);
             } elseif (in_array($code, self::NOT_YET, true)) {
                 $ids[$id]['state'] = 'retry';
                 $notYet = true;
@@ -76,5 +77,19 @@ final class Fetch extends StepRunner
         }
 
         return Outcome::done();
+    }
+
+    /** A lower cost in `task_get` than at post is DataForSEO's refund; it nets on the posting step. */
+    private static function takeRefund(Runtime $rt, Step $post, Step $step, array &$task, array $answer, bool $cached): void
+    {
+        $posted = (float) ($task['cost'] ?? 0);
+        $final = $answer['cost'] ?? null;
+
+        if ($cached || !is_numeric($final) || $posted <= 0 || (float) $final >= $posted) {
+            return;
+        }
+
+        $rt->client()->ledger()->refund($rt->contextFor($post), rtrim($step->endpoint, '/'), $posted - (float) $final);
+        $task['cost'] = (float) $final;
     }
 }

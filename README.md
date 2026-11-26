@@ -92,7 +92,8 @@ in the environment also work.
   approval; after the first run the estimate is calibrated from the ledger.
 - **The response's `cost` is the truth** and is booked before the answer is used.
   `task_get` answers repeat the price of the task already charged and are booked
-  at 0.
+  at 0; when DataForSEO refunds a search shorter than asked, the refund is booked
+  as a negative row.
 - Above `approve_above` a job waits in "waiting for approval". Every refusal is
   written to the event log.
 - Repeated questions are answered from the cache (SERP 7 days, keyword data 30

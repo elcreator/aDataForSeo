@@ -116,6 +116,33 @@ final class Ledger
         return $call;
     }
 
+    /**
+     * Money DataForSEO gave back for a task already booked at post: a SERP shorter than its
+     * depth is charged in full at `task_post` and its `task_get` reports the lower final cost.
+     * Booked as a negative row so the spend, the job and the posting step all net out.
+     */
+    public function refund(Context $ctx, string $endpoint, float $amount, array $meta = []): ?Call
+    {
+        $amount = round($amount, 6);
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $call = $this->record($ctx, $endpoint, 0.0, $meta + ['tasks' => 1]);
+        $call->forceFill(['cost' => -$amount])->save();
+
+        if ($ctx->jobId !== null) {
+            Job::query()->whereKey($ctx->jobId)->decrement('spent', $amount);
+        }
+
+        if ($ctx->stepId !== null) {
+            Step::query()->whereKey($ctx->stepId)->decrement('cost', $amount);
+        }
+
+        return $call;
+    }
+
     /** Spend in one currency (null: every row, for callers that only ever had one). */
     public function spent(int $projectId, Carbon $from, ?Carbon $to = null, ?string $currency = null): float
     {
