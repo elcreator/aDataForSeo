@@ -42,7 +42,11 @@ final class DocumentPanel
         }
 
         $e = [DashboardWidget::class, 'escape'];
-        $html = '<div class="tab-section" id="adataforseo-panel"><div class="tab-header">' . $e(Lang::get('aDataForSeo::global.panel_title')) . '</div><div class="tab-body" style="padding:1rem">';
+        // A tab of the document form, registered as the core registers its own: OnDocFormRender
+        // output lands inside the form's tab pane, where a `tab-section` has no frame.
+        $html = '<div class="tab-page" id="adataforseo-panel"><h2 class="tab">' . $e(Lang::get('aDataForSeo::global.panel_title')) . '</h2>'
+            . '<script>if (window.tpSettings) { tpSettings.addTabPage(document.getElementById("adataforseo-panel")); }</script>'
+            . '<div style="padding:.5rem 0">';
 
         foreach ($data['targets'] as $target) {
             $html .= '<p><b>' . $e((string) ($target['primary_keyword'] ?? '')) . '</b> — '
@@ -59,7 +63,7 @@ final class DocumentPanel
         }
 
         if ($data['issues'] !== []) {
-            $html .= '<ul>';
+            $html .= '<ul style="margin:.5rem 0 .5rem 1.25rem">';
 
             foreach ($data['issues'] as $issue) {
                 $html .= '<li>' . $e(Lang::get('aDataForSeo::global.code_' . $issue['code'])) . '</li>';

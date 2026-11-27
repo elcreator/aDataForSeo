@@ -68,7 +68,7 @@ it('offers AI variants only when switched on and payable, through the module’s
 });
 
 it('steps the old document block aside when sSeo shows ours under its fields', function () {
-    expect(DocumentPanel::handle(['id' => $this->doc]))->toContain('adataforseo-panel');
+    expect(DocumentPanel::handle(['id' => $this->doc]))->toContain('<div class="tab-page" id="adataforseo-panel"><h2 class="tab">Search</h2>')->toContain('tpSettings.addTabPage(document.getElementById("adataforseo-panel"))');
 
     $this->seo->fieldsHook = true;
     expect(DocumentPanel::handle(['id' => $this->doc]))->toBe('');
