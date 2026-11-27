@@ -475,6 +475,8 @@ return [
     'panel_title' => 'Search',
     'panel_demand' => ':n searches a month',
     'panel_hint' => 'Suggested titles and fixes are applied from the Search module.',
+    'panel_hint_fields' => '“Use this” fills the field; Save the document to keep it. The change shows in the module’s history, where it can be undone.',
+    'panel_top10' => 'Google’s top 10',
 
     // Paying from the ai.artur.work balance
     'ui_env_gateway' => 'ai.artur.work balance',

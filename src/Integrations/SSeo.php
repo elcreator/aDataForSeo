@@ -21,6 +21,7 @@ final class SSeo
     public const FACADE = 'Seiger\sSeo\Facades\sSeo';
     public const MODEL = 'Seiger\sSeo\Models\sSeoModel';
     public const REDIRECT = 'Seiger\sSeo\Models\sRedirect';
+    public const FIELDS_HOOK = 'Seiger\sSeo\Support\FieldExtensions';
 
     /** Fields a fix may write. */
     public const FIELDS = ['meta_title', 'meta_description', 'meta_keywords', 'robots', 'canonical_url', 'exclude_from_sitemap'];
@@ -44,6 +45,19 @@ final class SSeo
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /**
+     * Whether sSeo shows other packages' blocks under its fields (the `sSeoFieldsRender` event,
+     * Seiger/sSeo#19). Then this plugin's hints live there instead of in a block of their own.
+     */
+    public static function hasFieldsHook(): bool
+    {
+        if (self::$fake !== null) {
+            return method_exists(self::$fake, 'hasFieldsHook') && (bool) self::$fake->hasFieldsHook();
+        }
+
+        return class_exists(self::FIELDS_HOOK);
     }
 
     /** @return array<string, mixed> current values of the given fields ('' when unset) */

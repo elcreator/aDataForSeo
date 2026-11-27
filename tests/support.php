@@ -361,9 +361,17 @@ final class AdfsFakeSeo
 
     public int $writes = 0;
 
+    /** sSeo with `sSeoFieldsRender` (Seiger/sSeo#19). */
+    public bool $fieldsHook = false;
+
     public function available(): bool
     {
         return true;
+    }
+
+    public function hasFieldsHook(): bool
+    {
+        return $this->fieldsHook;
     }
 
     public function read(int $id, string $type, string $lang, array $fields): array

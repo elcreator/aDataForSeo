@@ -130,6 +130,14 @@ change keeps the previous value and can be undone while the field still holds
 what was written. Without sSeo the same findings are shown as instructions.
 sLang languages and sMultisite domains are respected.
 
+On the document form, the page's search, its demand, Google's top 10 and the
+open findings are shown in a "Search" block. With an sSeo that has the
+`sSeoFieldsRender` event ([Seiger/sSeo#19](https://github.com/Seiger/sSeo/pull/19)),
+the block sits under sSeo's own title and description in every language tab.
+**Use this** fills a suggested value into the field (with AI suggestions on,
+also **Suggest with AI**). Saving the document stores it, books it in the
+module's history like Apply does, so it can be undone, and closes the finding.
+
 ## Configuration
 
 `config/aDataForSeo.php`, merged under `cms.settings.aDataForSeo`; override in
@@ -173,7 +181,7 @@ ci/compose-evo.sh <dir> --dev && ci/run-tests.sh <dir>   # a CMS with this plugi
 ci/demo.sh                                       # CMS + plugin + demo data in Docker, http://localhost:8080/manager/
 ```
 
-See `docs/DESIGN.md` for the contracts and `ci/README.md` for the pipeline.
+See `ci/README.md` for the pipeline.
 
 ## License
 

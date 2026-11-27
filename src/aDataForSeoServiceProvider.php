@@ -9,6 +9,8 @@ use Elcreator\aDataForSeo\Listeners\DashboardWidget;
 use Elcreator\aDataForSeo\Listeners\DocumentPanel;
 use Elcreator\aDataForSeo\Listeners\GatewayReturn;
 use Elcreator\aDataForSeo\Listeners\Pingback;
+use Elcreator\aDataForSeo\Listeners\SeoFieldsHint;
+use Elcreator\aDataForSeo\Listeners\SeoFieldsJournal;
 use Elcreator\aDataForSeo\Listeners\UrlMapInvalidation;
 use Elcreator\aDataForSeo\Queue\STaskQueue;
 use Elcreator\aDataForSeo\Support\Config;
@@ -111,6 +113,9 @@ class aDataForSeoServiceProvider extends ServiceProvider
 
         $events->listen('evolution.OnManagerWelcomeHome', [DashboardWidget::class, 'handle']);
         $events->listen('evolution.OnDocFormRender', [DocumentPanel::class, 'handle']);
+        // sSeo with the fields hook (Seiger/sSeo#19): the block sits under its title and description instead.
+        $events->listen('evolution.sSeoFieldsRender', [SeoFieldsHint::class, 'handle']);
+        $events->listen('evolution.OnDocFormSave', [SeoFieldsJournal::class, 'handle']);
 
         foreach (['OnDocFormSave', 'OnDocPublished', 'OnDocUnPublished', 'OnDocFormDelete'] as $event) {
             $events->listen('evolution.' . $event, [UrlMapInvalidation::class, 'handle']);

@@ -2,6 +2,7 @@
 
 namespace Elcreator\aDataForSeo\Listeners;
 
+use Elcreator\aDataForSeo\Integrations\SSeo;
 use Elcreator\aDataForSeo\Models\Project;
 use Elcreator\aDataForSeo\Services\Actor;
 use Elcreator\aDataForSeo\Services\Reports;
@@ -21,7 +22,8 @@ final class DocumentPanel
         try {
             $id = (int) ($params['id'] ?? 0);
 
-            if ($id <= 0 || !Actor::current()->mayUse()) {
+            // sSeo shows the same block under its own fields (SeoFieldsHint): no second copy.
+            if ($id <= 0 || SSeo::hasFieldsHook() || !Actor::current()->mayUse()) {
                 return '';
             }
 

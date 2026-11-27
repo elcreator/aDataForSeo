@@ -178,12 +178,26 @@ final class Manager
     /** `EVO_MANAGER_URL` is right under a request, a working-directory guess otherwise. */
     public static function mediaUrl(string $path): string
     {
+        return self::managerUrl() . '/media/' . ltrim($path, '/');
+    }
+
+    /**
+     * The module's routes as seen from another manager page (the document form):
+     * `registerRoutingModule()` prefixes them with `modules/<md5 of the module name>`.
+     */
+    public static function moduleUrl(string $path = ''): string
+    {
+        return self::managerUrl() . '/modules/' . md5(\Elcreator\aDataForSeo\aDataForSeoServiceProvider::MODULE_NAME) . ($path === '' ? '' : '/' . ltrim($path, '/'));
+    }
+
+    private static function managerUrl(): string
+    {
         $base = defined('EVO_MANAGER_URL') ? (string) EVO_MANAGER_URL : '';
 
         if ($base === '' || !preg_match('#^(?:https?:)?//|^/#', $base)) {
             $base = '/' . (defined('MGR_DIR') ? trim((string) MGR_DIR, '/') : 'manager') . '/';
         }
 
-        return rtrim($base, '/') . '/media/' . ltrim($path, '/');
+        return rtrim($base, '/');
     }
 }
