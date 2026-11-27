@@ -3,7 +3,8 @@
 Context file for AI coding agents. Package `elcreator/adataforseo`, namespace `Elcreator\aDataForSeo\` -> `src/`,
 PHP 8.3+, an **Evolution CMS 3.5+** plugin (`evolutioncms-plugin`), GPL-3.0-or-later. `docs/DESIGN.md` is the
 authoritative contract (hard rules, data model, service APIs, build waves); `README.md` is the user-facing view.
-Read both before changing behaviour.
+Read both before changing behaviour. `docs/` (DESIGN.md, TODO.md) is the maintainer's working notes, kept outside git;
+when it is absent, the code, its docblocks and this file are what you have.
 
 ## What it is
 
