@@ -247,11 +247,31 @@
         return h('span', { 'class': 'sx-try' }, [
             h('span', { 'class': 'sx-try-row' }, [
                 h('span', { 'class': 'sx-try-lead', text: t('ui_need_login') }),
-                h('a', { 'class': 'sx-btn sx-btn-try', href: CFG.signup, target: '_blank', rel: 'sponsored noopener noreferrer' },
-                    [icon('rocket'), ' ', t('ui_try_free'), ' ', h('span', { 'class': 'sx-ad', text: t('ui_ad') })])
+                tryLink()
             ]),
             h('span', { 'class': 'sx-help sx-small', text: t('ui_affiliate_disclosure') })
         ]);
+    }
+    function tryLink() {
+        return h('a', { 'class': 'sx-btn sx-btn-try', href: CFG.signup, target: '_blank', rel: 'sponsored noopener noreferrer' },
+            [icon('rocket'), ' ', t('ui_try_free'), ' ', h('span', { 'class': 'sx-ad', text: t('ui_ad') })]);
+    }
+    /** Refusals that a DataForSEO account would solve. */
+    var NEEDS_ACCOUNT = ['error_gateway_unsupported', 'error_no_key'];
+    /**
+     * A popup that says a DataForSEO account is needed gets the sign-up as its action button,
+     * with the disclosure in its text; not for someone who already has a real account.
+     * Returns [body, actions] to pass on to modal().
+     */
+    function withTry(body, actions) {
+        var own = S.boot && S.boot.keys && S.boot.keys.own;
+        if (!CFG.signup || (own && own.present && own.env === 'prod')) { return [body, actions || []]; }
+        return [body.concat([h('p', { 'class': 'sx-help sx-small', text: t('ui_affiliate_disclosure') })]), (actions || []).concat([tryLink()])];
+    }
+    function needsAccount(r) { return !!r && NEEDS_ACCOUNT.indexOf(r.error) >= 0; }
+    function accountModal(title, body, actions) {
+        var parts = withTry(body, actions);
+        return modal(title, parts[0], parts[1]);
     }
 
     // ------------------------------------------------------------------
@@ -380,7 +400,7 @@
     function runJob(kind, options, after) {
         options = options || {};
         api('POST', '/jobs/estimate', { kind: kind, options: options }).then(function (r) {
-            if (!r || r.ok === false) { modal(t('kind_' + kind), [h('div', { 'class': 'sx-alert sx-alert-error', text: errMsg(r) })]); return; }
+            if (!r || r.ok === false) { (needsAccount(r) ? accountModal : modal)(t('kind_' + kind), [h('div', { 'class': 'sx-alert sx-alert-error', text: errMsg(r) })]); return; }
             var e = r.estimate;
             var cur = r.currency;
             var body = [
@@ -395,7 +415,7 @@
             var start = btn(t('ui_start'), { primary: true, icon: 'play', disabled: !S.boot.flags.may_spend, onclick: function (b) {
                 b.disabled = true;
                 api('POST', '/jobs', { kind: kind, options: options }).then(function (res) {
-                    if (!res || res.ok === false) { add(m.body, h('div', { 'class': 'sx-alert sx-alert-error', text: errMsg(res) })); b.disabled = false; return; }
+                    if (!res || res.ok === false) { add(m.body, h('div', { 'class': 'sx-alert sx-alert-error', text: errMsg(res) })); if (needsAccount(res)) { add(m.body, tryButton()); } b.disabled = false; return; }
                     m.close();
                     live(t('ui_job_started'));
                     refreshJobs().then(function () { if (after) { after(res.job); } else { go('jobs'); } });

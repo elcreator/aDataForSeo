@@ -417,7 +417,8 @@ describe('conventions', function () {
             ->and($js)->toMatch('/href:\s*CFG\.signup,\s*target:\s*\'_blank\',\s*rel:\s*\'sponsored noopener noreferrer\'/')
             ->and($js)->toContain("t('ui_try_free')")
             ->and($js)->toContain("t('ui_ad')")
-            ->and($js)->toMatch("/t\\('ui_need_login'\\)[\\s\\S]{0,200}t\\('ui_try_free'\\)/")
+            ->and($js)->toMatch("/t\\('ui_need_login'\\)[\\s\\S]{0,200}tryLink\\(\\)/")
+            ->and($js)->toMatch("/function tryLink\\(\\)[\\s\\S]{0,300}t\\('ui_try_free'\\)/")
             ->and($js)->toContain("t('ui_affiliate_disclosure')");
     });
 

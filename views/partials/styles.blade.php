@@ -62,6 +62,8 @@
     .sx-panel h2 { margin: 0 0 .6rem; font-size: 1rem; }
     .sx-panel h3 { margin: .8rem 0 .4rem; font-size: .9rem; }
     .sx-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: 1rem; }
+    /* Buttons under fields, also past the empty message holder between them. */
+    :is(.sx-form, .sx-field) + .sx-toolbar, :is(.sx-form, .sx-field) + :empty + .sx-toolbar { margin-top: 1rem; }
     .sx-grow { flex: 1; }
     .sx-muted { color: var(--sx-muted); }
     .sx-small { font-size: .85rem; }

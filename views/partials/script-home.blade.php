@@ -182,7 +182,7 @@
             var ownOnly = gateway && (k[0] === 'research' || k[0] === 'track' || k[0] === 'competitors');
             var needsResearch = !gateway && (k[0] === 'difficulty' || k[0] === 'track' || k[0] === 'competitors') && done.indexOf('research') < 0;
             var onclick = function () { runJob(k[0]); };
-            if (ownOnly) { onclick = function () { modal(t('kind_' + k[0]), [h('div', { 'class': 'sx-alert sx-alert-info', text: t('ui_gateway_needs_own', { what: t('kind_' + k[0]) }) })]); }; }
+            if (ownOnly) { onclick = function () { accountModal(t('kind_' + k[0]), [h('div', { 'class': 'sx-alert sx-alert-info', text: t('ui_gateway_needs_own', { what: t('kind_' + k[0]) }) })]); }; }
             else if (gateway && k[0] === 'difficulty') { onclick = difficultyDialog; }
             add(row, btn(t('kind_' + k[0]), { icon: k[1], cls: ownOnly ? 'is-muted' : null, disabled: needsResearch || !S.boot.flags.may_spend, title: needsResearch ? t('ui_needs_research') : (ownOnly ? t('ui_gateway_needs_own', { what: t('kind_' + k[0]) }) : t('ui_kind_help_' + k[0])), onclick: onclick }));
         });

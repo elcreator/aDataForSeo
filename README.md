@@ -59,7 +59,8 @@ run as an sTask worker instead (`queue.driver`: `auto` / `system` / `stask`).
 
 With your own DataForSEO account the data is yours: shown, stored, exported and
 cached as you like (confirmed by DataForSEO's customer success team, November
-2026). No account yet? The wizard has a **Try DataForSeo for free** link (an
+2026). No account yet? The wizard, and every popup that says a DataForSEO account is
+needed, has a **Try DataForSeo for free** button (an
 affiliate link, marked as an ad and disclosed; the plugin's author may earn a
 commission; change it with `api.signup_url`), and
 **demo data** works without any account: invented but realistic answers built

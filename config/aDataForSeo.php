@@ -29,7 +29,7 @@ return [
         // Task-level codes worth another attempt (rate limits, internal errors, "try again later").
         'retryable_codes' => [40202, 40209, 40210, 50000, 50301, 50303],
         // The "Try DataForSeo for free" link for someone without an account: an affiliate link, shown marked "(Ad)" with a disclosure.
-        'signup_url' => 'https://try.dataforseo.com/su3o1t15dxhx',
+        'signup_url' => 'https://try.dataforseo.com/aDataForSeo',
     ],
 
     // Pay from an ai.artur.work balance instead of a DataForSEO account: analytics only
