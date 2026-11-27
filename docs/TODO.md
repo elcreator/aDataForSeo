@@ -44,7 +44,16 @@ gateway's daily billing reconciliation (`SeoData\Reconciliation`, admin panel + 
 ## Open questions (DESIGN.md "Open questions")
 
 10. Shared queue package for aMount / aIMage / this plugin, or keep copies.
-11. An sSeo extension point so suggestions sit next to its fields.
+11. **sSeo extension point: proposed upstream** (2026-11-27, branch `feat/seo-fields-extension-event` of
+    `elcreator/sSeo`, PR to `Seiger/sSeo`). The event `sSeoFieldsRender` gets `resource_id`, `resource_type`, `lang`,
+    `domain_key` and the current `fields`; the HTML that listeners return is shown under the meta description in every
+    language tab. It was checked in `adfs-serve`, which now has sSeo installed from that branch
+    (`core/custom/packages/sseo`; snapshot taken before: image `adataforseo-serve:before-sseo-20261127`). Still to
+    build in this plugin: a listener that shows the target query, demand, position and template suggestions there, with
+    "Use this" filling `sseo[<lang>][meta_title]` / `[meta_description]` and setting `documentDirty`. Also "Suggest with
+    AI" (needs the module's base URL and a CSRF token on the document form). When the event fires, the separate
+    `DocumentPanel` block (`OnDocFormRender`) should step aside. Until the PR is merged and released, keep
+    `DocumentPanel` as it is.
 12. Which verticals follow real estate in the lexicon (shop, services, local business).
 13. Record-level data (raw keywords/SERPs, research, tracking, competitors) through the gateway needs a separate
     written agreement with DataForSEO; until then those stay own-key only.
