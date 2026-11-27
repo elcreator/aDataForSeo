@@ -484,7 +484,7 @@ return [
     'ui_wiz_gateway_help' => 'No DataForSEO account needed. Index coverage, the technical audit and difficulty, paid in euros from your ai.artur.work balance. Every action shows its price first.',
     'ui_gateway_title' => 'ai.artur.work balance',
     'ui_gateway_connect' => 'Connect with ai.artur.work',
-    'ui_gateway_connect_help' => 'You allow this site on ai.artur.work and set how much it may spend. No key to copy.',
+    'ui_gateway_connect_help' => 'You allow this site on ai.artur.work and set how much it may spend. No key to copy; to keep one for rotating it later, tick “Show me the key” there.',
     'ui_gateway_paste' => 'Or paste an API key',
     'ui_gateway_present' => 'Connected: :key',
     'ui_gateway_missing' => 'No ai.artur.work key connected.',

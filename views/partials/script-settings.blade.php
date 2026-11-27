@@ -55,7 +55,9 @@
                 h('a', { 'class': 'sx-btn sx-btn-primary', href: BASE + '/gateway/connect?scope=' + scope, target: '_top' }, [icon('key'), ' ', t('ui_gateway_connect')]),
                 topUp ? h('a', { 'class': 'sx-btn', href: topUp, target: '_blank', rel: 'noopener noreferrer' }, [icon('money'), ' ', t('ui_gateway_topup')]) : null
             ]),
-            h('div', { 'class': 'sx-form', style: 'margin-top:.8rem' }, [field(t('ui_gateway_paste') + ': ' + t('field_gateway_key'), pasted, t('ui_gateway_key_help'))]),
+            // A second, separate way in: set apart so the Connect button above is not read as this field's submit.
+            h('div', { 'class': 'sx-or', role: 'separator', text: t('ui_gateway_paste') }),
+            h('div', { 'class': 'sx-form' }, [field(t('field_gateway_key'), pasted, t('ui_gateway_key_help'))]),
             msg,
             h('div', { 'class': 'sx-toolbar' }, [
                 btn(t('ui_save_verify'), { primary: true, icon: 'check', disabled: !b.flags.may_spend, onclick: function (bt) {
